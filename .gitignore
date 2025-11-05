@@ -1,0 +1,82 @@
+# --- Python bytecode / cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# --- Package/build artifacts ---
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+pip-log.txt
+
+# --- Testing & coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# --- Static type checkers / linters ---
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+.dmypy.json
+
+# --- Jupyter / notebooks ---
+.ipynb_checkpoints/
+
+# --- Logs & runtime output ---
+logs/
+*.log
+*.pid
+celerybeat-schedule
+celerybeat.pid
+
+# --- Local databases ---
+*.sqlite
+*.sqlite3
+*.db
+
+# --- Environment / secrets (FastAPI/Uvicorn) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+.fleet/
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Node (if you have a small frontend in the repo) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Misc scratch/temp ---
+tmp/
+.temp/
+*.swp
+*.swo

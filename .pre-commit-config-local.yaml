@@ -1,0 +1,44 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-lint
+        name: Backend Lint (Ruff)
+        entry: bash -c 'cd apps/backend && poetry run ruff check .'
+        language: system
+        files: ^apps/backend/.*\.py$
+        pass_filenames: false
+
+      - id: backend-format
+        name: Backend Format (Black)
+        entry: bash -c 'cd apps/backend && poetry run black .'
+        language: system
+        files: ^apps/backend/.*\.py$
+        pass_filenames: false
+
+      - id: backend-typecheck
+        name: Backend Type Check (MyPy)
+        entry: bash -c 'cd apps/backend && poetry run mypy .'
+        language: system
+        files: ^apps/backend/.*\.py$
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: Frontend Lint (ESLint)
+        entry: bash -c 'cd apps/frontend && pnpm lint:fix'
+        language: system
+        files: ^apps/frontend/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      - id: frontend-format
+        name: Frontend Format (Prettier)
+        entry: bash -c 'cd apps/frontend && pnpm format'
+        language: system
+        files: ^apps/frontend/.*\.(js|jsx|ts|tsx|json|css|md)$
+        pass_filenames: false
+
+      - id: frontend-typecheck
+        name: Frontend Type Check (TypeScript)
+        entry: bash -c 'cd apps/frontend && pnpm type-check'
+        language: system
+        files: ^apps/frontend/.*\.(ts|tsx)$
+        pass_filenames: false
