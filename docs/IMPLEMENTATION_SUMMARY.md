@@ -85,12 +85,21 @@ Created RESTful API endpoints following best practices:
 Added flat-generation endpoints for previewing and starting flat jobs:
 
 - `POST /api/v1/flat/preview` – returns the first 100 rows based on a provided flat schema; deterministic by seed.
-- `POST /api/v1/requests/{request_id}:start` – runs flat generation synchronously for now, writes artifacts, uploads to storage (MinIO/local), persists artifacts and per-column stats, and marks the request as completed.
+- `POST /api/v1/requests/{request_id}:start` – enqueues an RQ background job for flat generation, writes artifacts, uploads to storage (MinIO/local), persists artifacts and per-column stats, and updates the request status.
 
 Implementation:
 
-- Routers: `apps/backend/app/api/api_v1/endpoints/flat.py` (registered under `/flat` and `/requests`).
+- Routers: `apps/backend/app/api/api_v1/endpoints/flat.py` (registered under `/flat` and `/requests`). The same `start` action dispatches to flat or relational jobs based on `Request.type`.
 - Services: `apps/backend/app/services/flat.py` (generation + stats), `writers.py` (CSV/JSONL/Parquet/XLSX), `storage.py` (MinIO/local abstraction).
+
+### 5.2 Relational data generation – service, job, and tests
+
+Added a relational generation pipeline and background job:
+
+- Service: `apps/backend/app/services/relational.py` generates tables in topological order, maintains PK pools, samples foreign keys (`uniform`/`weighted`), enforces uniqueness with capped retries, and writes per-table CSV/Parquet plus a shared multi-sheet `data.xlsx`. Produces a report with FK coverage and uniqueness collisions.
+- Job: `apps/backend/app/jobs/relational_job.py` orchestrates generation, uploads artifacts via storage abstraction, persists `Artifact` records, stores the report under `params_json.relational_report`, and updates request status/timestamps.
+- API: `POST /api/v1/requests/{id}:start` enqueues `run_relational_job` when `Request.type == relational`.
+- Tests: `apps/backend/tests/test_relational_services.py` validates topological sorting, artifact outputs, 100% FK coverage for non-nullable FKs, and zero collisions for declared-unique columns.
 
 Task doc: `docs/tasks/2025-11-05-flat-endpoints.md`.
 

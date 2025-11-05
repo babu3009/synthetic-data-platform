@@ -10,12 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app import crud, schemas
 from app.db.models import ArtifactFormat, RequestStatus, RequestType
-from app.services.flat import preview as preview_flat, generate_to_artifacts
-from app.services.storage import get_storage
+from app.services.flat import preview as preview_flat
 from app.core.config import settings
 from typing import Any, Dict, cast
 from app.core.rq import get_queue
 from app.jobs.flat_job import run_flat_job
+from app.jobs.relational_job import run_relational_job
 
 router = APIRouter()
 # Separate router for request-scoped actions under /requests
@@ -40,12 +40,16 @@ async def start_request(
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
     # Pylance may see SQLAlchemy InstrumentedAttribute here; compare via string to avoid typing issues
-    if str(getattr(req, "type", "")) != RequestType.FLAT:
-        raise HTTPException(status_code=400, detail="Only flat requests are supported here")
+    rtype = str(getattr(req, "type", ""))
 
     # Enqueue background job with RQ
     q = cast(Any, get_queue())
-    job = q.enqueue(run_flat_job, str(request_id))
+    if rtype == RequestType.FLAT:
+        job = q.enqueue(run_flat_job, str(request_id))
+    elif rtype == RequestType.RELATIONAL:
+        job = q.enqueue(run_relational_job, str(request_id))
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported request type for start")
 
     # Stash job id in params and keep status as PENDING (worker will set RUNNING)
     params = req.params_json or {}
