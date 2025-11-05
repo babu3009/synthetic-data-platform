@@ -62,7 +62,7 @@ class Project(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False, index=True)
     owner = Column(String(255), nullable=False, index=True)
-    tags = Column(ARRAY(String), default=list, nullable=False)
+    tags = Column(JSONB, default=list, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
@@ -79,13 +79,43 @@ class Source(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
-    kind = Column(Enum(SourceKind), nullable=False, index=True)
+    kind = Column(String(50), nullable=False, index=True)  # Changed from Enum to String
     storage_uri = Column(String(2048), nullable=False)
     checksum = Column(String(64), nullable=True)  # SHA-256 hash
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     project = relationship("Project", back_populates="sources")
+    schema = relationship("Schema", back_populates="source", uselist=False, cascade="all, delete-orphan")
+
+
+class Schema(Base):
+    """Parsed schema definition from DDL or JSON source."""
+    __tablename__ = "schemas"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.sources.id"), nullable=False, unique=True, index=True)
+    schema_json = Column(JSONB, nullable=False)
+    # schema_json structure:
+    # {
+    #   "tables": [{
+    #     "name": str,
+    #     "columns": [{"name": str, "dtype": str, "nullable": bool, "pii_tag": str?}],
+    #     "pk": [str],
+    #     "uniques": [[str]],
+    #     "checks": [{"name": str?, "expression": str}],
+    #     "fks": [{"from_col": str, "to_table": str, "to_col": str}]
+    #   }],
+    #   "dag": {"nodes": [str], "edges": [[str, str]]},
+    #   "warnings": [str]
+    # }
+    dag_json = Column(JSONB, nullable=False)  # Precomputed DAG for quick access
+    warnings = Column(ARRAY(String), default=list, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    source = relationship("Source", back_populates="schema")
 
 
 class Request(Base):

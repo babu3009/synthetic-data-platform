@@ -27,6 +27,14 @@ __all__ = [
     "SourceInDBBase",
     "Source",
     "SourceInDB",
+    "ColumnSchema",
+    "CheckConstraint",
+    "ForeignKey",
+    "TableSchema",
+    "DAGSchema",
+    "CanonicalSchema",
+    "SchemaResponse",
+    "SourceUploadResponse",
 ]
 
 from .artifact import (
@@ -60,4 +68,14 @@ from .source import (
     SourceInDBBase,
     Source,
     SourceInDB,
+)
+from .schema import (
+    ColumnSchema,
+    CheckConstraint,
+    ForeignKey,
+    TableSchema,
+    DAGSchema,
+    CanonicalSchema,
+    SchemaResponse,
+    SourceUploadResponse,
 )
