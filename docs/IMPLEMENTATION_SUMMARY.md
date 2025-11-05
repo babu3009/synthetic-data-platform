@@ -101,6 +101,21 @@ Added a relational generation pipeline and background job:
 - API: `POST /api/v1/requests/{id}:start` enqueues `run_relational_job` when `Request.type == relational`.
 - Tests: `apps/backend/tests/test_relational_services.py` validates topological sorting, artifact outputs, 100% FK coverage for non-nullable FKs, and zero collisions for declared-unique columns.
 
+### 5.3 Rules DSL and on-demand validation
+
+Added a compact rules DSL, validation engine, and an on-demand API endpoint:
+
+- Parser: `apps/backend/app/services/rules_dsl.py` converts DSL to normalized JSON and safely evaluates expressions, supporting dotted `table.column` via aliasing.
+- Validator: `apps/backend/app/services/validator.py` evaluates implication, uniqueness, distribution (chi-square), and temporal rules on sample and final datasets, returning counts, rates, stats, and violation samples.
+- API: `POST /api/v1/validate` (`apps/backend/app/api/api_v1/endpoints/validate.py`) runs validation without persisting data.
+- Tests: `tests/test_rules_parser.py`, `tests/test_validation_distribution.py`, `tests/test_validation_rules.py`, and `tests/test_api_validate.py`.
+
+### Frontend integration notes
+
+For future UI wiring (endpoints, payloads, TS types, fetch helpers, and a simple plan), see:
+
+- `docs/tasks/2025-11-06-frontend-integration-notes.md`
+
 Task doc: `docs/tasks/2025-11-05-flat-endpoints.md`.
 
 ### 6. Database Scripts

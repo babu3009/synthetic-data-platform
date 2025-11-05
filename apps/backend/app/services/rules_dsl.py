@@ -127,8 +127,13 @@ def evaluate_expression(expr: str, row: Dict[str, Any], table: str = "") -> bool
     Provides both column and table.column names in the context.
     """
     ctx = dict(row)
-    # also add table-prefixed names if table provided
+    # also add table-prefixed names if table provided and underscored aliases for attribute-like access
+    rewritten = expr
     if table:
         for k, v in row.items():
-            ctx[f"{table}.{k}"] = v
-    return bool(_safe_eval(expr, ctx))
+            # make 'table.column' available as 'table__column' to avoid ast.Attribute usage
+            alias = f"{table}__{k}"
+            ctx[alias] = v
+        # rewrite occurrences of 'table.column' to 'table__column'
+        rewritten = rewritten.replace(f"{table}.", f"{table}__")
+    return bool(_safe_eval(rewritten, ctx))
