@@ -3,19 +3,20 @@ from __future__ import annotations
 """
 Minimal RQ worker launcher.
 
-Note: The actual job implementation lives in app.jobs.flat_job.
-This module only provides a CLI entrypoint to start a worker and is
-kept intentionally simple to avoid type-checker import issues when RQ/Redis
-aren't installed in certain environments.
+This module provides a CLI entrypoint to start an RQ worker that listens to
+priority queues ("high", "default", "low") and enables the builtin scheduler
+loop (with_scheduler=True) so delayed jobs can run if scheduled externally.
 """
 
 def run_worker() -> None:  # pragma: no cover - runtime utility
     try:
         from rq import Connection, Worker  # type: ignore
-        from app.services.jobs import get_redis_connection  # type: ignore
+        from app.core.rq import get_redis_connection  # type: ignore
 
+        # Listen to priority queues in order
+        queues = ["high", "default", "low"]
         with Connection(get_redis_connection()):
-            Worker(["flat", "default"]).work(with_scheduler=True)
+            Worker(queues).work(with_scheduler=True)
     except Exception:
         # Avoid crashing during static analysis or missing optional deps
         pass

@@ -201,6 +201,50 @@ FROM artifacts a
 JOIN requests r ON a.request_id = r.id;
 ```
 
+## Database configuration and schema selection
+
+This backend supports two ways to configure the database connection:
+
+- DATABASE_URL (recommended): a full SQLAlchemy URL; when set, it takes precedence over individual POSTGRES_* fields.
+- POSTGRES_* fields: host/user/password/db/port used to construct an async URL when DATABASE_URL is not provided.
+
+Example DATABASE_URL (async, using asyncpg):
+
+```powershell
+# PowerShell example
+$env:DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/synthetic_data_platform"
+```
+
+If DATABASE_URL is not set, the URL is built from these variables:
+
+```text
+POSTGRES_SERVER=localhost
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=synthetic_data_platform
+POSTGRES_PORT=5432
+```
+
+### Schema selection
+
+- DB_SCHEMA: The application schema used in normal (development/production) runs. Defaults to `synthetic_data`.
+- TESTING_DB_SCHEMA: Optional separate schema used when tests run. If set, tests prefer this schema to keep test data isolated from your main schema.
+
+When tests execute, the app’s metadata will target TESTING_DB_SCHEMA (if provided); otherwise it will continue to use DB_SCHEMA.
+
+You can pre-create the testing schema and its tables using the helper script:
+
+```powershell
+cd apps/backend
+$env:PYTHONPATH = '.'
+python scripts/create_testing_schema.py
+```
+
+Notes:
+
+- The application uses async drivers (asyncpg). For admin tooling/migrations that need sync drivers, the code constructs a sync URL by replacing `+asyncpg` with `+psycopg2` where appropriate.
+- For Postgres multi-schema setups, the engines set `search_path` to "<schema>, public" so queries target the configured schema.
+
 ### Reset Database
 
 To completely reset the database:

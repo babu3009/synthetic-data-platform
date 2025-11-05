@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "synthetic_data_platform"
     POSTGRES_PORT: str = "5432"
     DATABASE_URL: Optional[PostgresDsn] = None
+    # Database schema (and optional testing schema)
+    DB_SCHEMA: str = "synthetic_data"
+    TESTING_DB_SCHEMA: Optional[str] = None
+    DB_SCHEMA: str = "synthetic_data"
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:

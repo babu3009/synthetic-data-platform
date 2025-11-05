@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from app.core.config import settings
 
 _redis: Any = None
-_queue: Any = None
+_queues: Dict[str, Any] = {}
 
 
 def get_redis_connection() -> Any:
@@ -25,9 +25,13 @@ def get_redis_connection() -> Any:
 
 
 def get_queue(name: str = "default") -> Any:
-    global _queue
-    if _queue is None:
+    """Return a named RQ queue. Caches per name.
+
+    Supported names: "low", "default", "high" (but any name is accepted).
+    """
+    global _queues
+    if name not in _queues:
         from rq import Queue  # type: ignore
 
-        _queue = Queue(name, connection=get_redis_connection())
-    return _queue
+        _queues[name] = Queue(name, connection=get_redis_connection())
+    return _queues[name]

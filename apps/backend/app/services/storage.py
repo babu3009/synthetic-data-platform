@@ -22,6 +22,10 @@ class StoredObject:
 class Storage:
     def put_file(self, local_path: Path, object_name: str) -> StoredObject:
         raise NotImplementedError
+    def get_signed_url(self, object_name: str, expires_seconds: int = 3600) -> str:
+        raise NotImplementedError
+    def delete_object(self, object_name: str) -> None:
+        raise NotImplementedError
 
 
 class MinioStorage(Storage):
@@ -42,10 +46,19 @@ class MinioStorage(Storage):
     def put_file(self, local_path: Path, object_name: str) -> StoredObject:
         self.client.fput_object(self.bucket, object_name, str(local_path))
         uri = f"s3://{self.bucket}/{object_name}"
-        # 7 days expiry
-        signed = self.client.presigned_get_object(self.bucket, object_name)
+        # default signed URL
+        signed = self.get_signed_url(object_name)
         size = local_path.stat().st_size
         return StoredObject(uri=uri, size=size, signed_url=signed)
+
+    def get_signed_url(self, object_name: str, expires_seconds: int = 3600) -> str:
+        from datetime import timedelta
+        return self.client.presigned_get_object(
+            self.bucket, object_name, expires=timedelta(seconds=expires_seconds)
+        )
+
+    def delete_object(self, object_name: str) -> None:
+        self.client.remove_object(self.bucket, object_name)
 
 
 class LocalStorage(Storage):
@@ -57,8 +70,17 @@ class LocalStorage(Storage):
         dest = self.base / object_name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(local_path.read_bytes())
-        uri = dest.as_uri()
+        uri = dest.resolve().as_uri()
         return StoredObject(uri=uri, size=dest.stat().st_size, signed_url=uri)
+
+    def get_signed_url(self, object_name: str, expires_seconds: int = 3600) -> str:
+        dest = self.base / object_name
+        return dest.resolve().as_uri()
+
+    def delete_object(self, object_name: str) -> None:
+        dest = self.base / object_name
+        if dest.exists():
+            dest.unlink()
 
 
 def get_storage() -> Storage:

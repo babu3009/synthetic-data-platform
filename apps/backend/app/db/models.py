@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from .base import Base, SCHEMA_NAME
+from .types import StringArray
 
 
 class SourceKind(str, enum.Enum):
@@ -64,6 +65,9 @@ class Project(Base):
     owner = Column(String(255), nullable=False, index=True)
     tags = Column(JSONB, default=list, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Settings
+    webhook_run_status_url = Column(String(2048), nullable=True)
+    artifact_ttl_days = Column(Integer, nullable=True)
 
     # Relationships
     sources = relationship("Source", back_populates="project", cascade="all, delete-orphan")
@@ -111,7 +115,7 @@ class Schema(Base):
     #   "warnings": [str]
     # }
     dag_json = Column(JSONB, nullable=False)  # Precomputed DAG for quick access
-    warnings = Column(ARRAY(String), default=list, nullable=False)
+    warnings = Column(StringArray(), default=list, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
@@ -179,7 +183,7 @@ class ApiKey(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     hashed_key = Column(String(255), nullable=False, unique=True, index=True)
-    scopes = Column(ARRAY(String), default=list, nullable=False)
+    scopes = Column(StringArray(), default=list, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships

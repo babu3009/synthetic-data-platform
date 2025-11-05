@@ -3,7 +3,8 @@ Database session configuration.
 """
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from typing import AsyncGenerator
 
 from app.core.config import settings
 from app.db.base import SCHEMA_NAME
@@ -34,15 +35,16 @@ engine = create_async_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 # Create async sessionmaker for application
-AsyncSessionLocal = sessionmaker(
-    engine,
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
     class_=AsyncSession,
     autocommit=False,
     autoflush=False,
+    expire_on_commit=False,
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency function that yields database sessions.
     """
@@ -54,7 +56,7 @@ async def get_db() -> AsyncSession:
 
 
 # Legacy alias for backward compatibility
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Legacy session getter."""
     async for session in get_db():
         yield session

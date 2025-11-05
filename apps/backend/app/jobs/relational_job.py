@@ -6,11 +6,13 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from rq import get_current_job  # type: ignore
 
 from app.db.session import SessionLocal
-from app.db.models import Request, RequestStatus, RequestType, Artifact, ArtifactFormat
+from app.db.models import Request, RequestStatus, RequestType, Artifact, ArtifactFormat, Project
 from app.services.relational import generate_to_artifacts
 from app.services.storage import get_storage
+from app.services.notify import post_run_status
 
 
 def run_relational_job(request_id: str) -> None:
@@ -30,6 +32,24 @@ def run_relational_job(request_id: str) -> None:
         session.add(req)
         session.commit()
         session.refresh(req)
+
+        # Notify RUNNING
+        proj = session.get(Project, getattr(req, "project_id", None))
+        webhook = getattr(proj, "webhook_run_status_url", None) if proj else None
+        job = get_current_job()
+        if job is not None:
+            job.meta["status"] = "running"
+            job.meta["progress"] = 0
+            job.save_meta()
+        post_run_status(
+            webhook,
+            {
+                "project_id": str(getattr(req, "project_id", "")),
+                "request_id": str(request_id),
+                "status": "running",
+                "progress": 0,
+            },
+        )
 
         params: Dict[str, Any] = {}
         raw = getattr(req, "params_json", None)
@@ -77,6 +97,20 @@ def run_relational_job(request_id: str) -> None:
                 )
                 session.add(art)
 
+        # Midway progress
+        if job is not None:
+            job.meta["progress"] = 90
+            job.save_meta()
+        post_run_status(
+            webhook,
+            {
+                "project_id": str(getattr(req, "project_id", "")),
+                "request_id": str(request_id),
+                "status": "running",
+                "progress": 90,
+            },
+        )
+
         # Persist report under params_json["relational_report"]
         params_out = dict(params)
         params_out["relational_report"] = report
@@ -85,6 +119,21 @@ def run_relational_job(request_id: str) -> None:
         setattr(req, "finished_at", datetime.now(timezone.utc))
         session.add(req)
         session.commit()
+
+        # Notify COMPLETED
+        if job is not None:
+            job.meta["status"] = "completed"
+            job.meta["progress"] = 100
+            job.save_meta()
+        post_run_status(
+            webhook,
+            {
+                "project_id": str(getattr(req, "project_id", "")),
+                "request_id": str(request_id),
+                "status": "completed",
+                "progress": 100,
+            },
+        )
 
     except Exception as e:  # pragma: no cover
         try:
@@ -100,7 +149,24 @@ def run_relational_job(request_id: str) -> None:
                 setattr(req2, "finished_at", datetime.now(timezone.utc))
                 session.add(req2)
                 session.commit()
+                # Notify FAILED
+                proj = session.get(Project, getattr(req2, "project_id", None))
+                webhook = getattr(proj, "webhook_run_status_url", None) if proj else None
+                job = get_current_job()
+                if job is not None:
+                    job.meta["status"] = "failed"
+                    job.save_meta()
+                post_run_status(
+                    webhook,
+                    {
+                        "project_id": str(getattr(req2, "project_id", "")),
+                        "request_id": str(request_id),
+                        "status": "failed",
+                        "error": str(e),
+                    },
+                )
         finally:
-            pass
+            # Re-raise to allow RQ Retry policies to apply
+            raise
     finally:
         session.close()

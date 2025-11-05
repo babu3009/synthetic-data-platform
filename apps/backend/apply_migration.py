@@ -40,6 +40,16 @@ async def apply_migration():
                 )
             """))
             print("  ✓ projects")
+
+            # Ensure new columns exist on projects
+            await conn.execute(text(f"""
+                ALTER TABLE {SCHEMA_NAME}.projects
+                ADD COLUMN IF NOT EXISTS webhook_run_status_url VARCHAR(2048)
+            """))
+            await conn.execute(text(f"""
+                ALTER TABLE {SCHEMA_NAME}.projects
+                ADD COLUMN IF NOT EXISTS artifact_ttl_days INTEGER
+            """))
             
             await conn.execute(text(f"""
                 CREATE INDEX IF NOT EXISTS ix_{SCHEMA_NAME}_projects_name 

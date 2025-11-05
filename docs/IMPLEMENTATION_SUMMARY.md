@@ -192,7 +192,7 @@ Created comprehensive documentation:
 - Performance tips
 - Next steps
 
-#### Quick Start Guide (`apps/backend/README_DATABASE.md`)
+#### Quick Start Guide (`apps/backend/docs/README_DATABASE.md`)
 - Installation instructions
 - Step-by-step setup guide
 - API examples with curl commands
@@ -282,7 +282,7 @@ apps/backend/
 │   └── test_api.py            # ✅ NEW (API tests)
 ├── setup_db.py                # ✅ NEW
 ├── validate_implementation.py # ✅ NEW
-└── README_DATABASE.md         # ✅ NEW
+└── docs/README_DATABASE.md    # ✅ NEW (moved under apps/backend/docs)
 
 docs/
 └── BACKEND_DATABASE.md        # ✅ NEW
