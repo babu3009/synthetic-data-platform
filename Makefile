@@ -114,6 +114,14 @@ seed: ## Seed database with sample data
 	@echo "$(YELLOW)Seeding database...$(NC)"
 	cd $(BACKEND_DIR) && poetry run python -m app.scripts.seed_db
 
+db-setup: ## Setup database with initial migration
+	@echo "$(YELLOW)Setting up database...$(NC)"
+	cd $(BACKEND_DIR) && python setup_db.py
+
+db-validate: ## Validate backend implementation
+	@echo "$(YELLOW)Validating backend implementation...$(NC)"
+	cd $(BACKEND_DIR) && python validate_implementation.py
+
 # Database management
 db-reset: ## Reset database (drop and recreate)
 	@echo "$(RED)Resetting database...$(NC)"

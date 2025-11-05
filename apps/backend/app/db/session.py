@@ -1,15 +1,51 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
+"""
+Database session configuration.
+"""
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings
 
-engine = create_async_engine(str(settings.DATABASE_URL), echo=True)
-async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+# Create sync engine for migrations
+sync_engine = create_engine(
+    settings.get_database_url().replace("+asyncpg", "+psycopg2"),
+    pool_pre_ping=True,
+    echo=False,
+)
 
-Base = declarative_base()
+# Create async engine for application
+engine = create_async_engine(
+    settings.get_database_url(),
+    pool_pre_ping=True,
+    echo=False,
+)
+
+# Create sessionmaker for sync operations (migrations)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+
+# Create async sessionmaker for application
+AsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+)
 
 
+async def get_db() -> AsyncSession:
+    """
+    Dependency function that yields database sessions.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+# Legacy alias for backward compatibility
 async def get_session() -> AsyncSession:
-    async with async_session_maker() as session:
+    """Legacy session getter."""
+    async for session in get_db():
         yield session
