@@ -1,6 +1,6 @@
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -17,10 +17,13 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-from app.db.base import Base  # noqa
+from app.db.base import Base, SCHEMA_NAME  # noqa
 from app.db import models  # noqa - ensure models are imported
 
 target_metadata = Base.metadata
+
+# Specify the schema to use
+version_table_schema = SCHEMA_NAME
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -46,6 +49,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_schema=version_table_schema,
+        include_schemas=True,
     )
 
     with context.begin_transaction():
@@ -53,7 +58,16 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    # Create schema if it doesn't exist
+    connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}"))
+    connection.commit()
+    
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table_schema=version_table_schema,
+        include_schemas=True,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

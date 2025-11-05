@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from .base import Base, SCHEMA_NAME
 
 
 class SourceKind(str, enum.Enum):
@@ -57,6 +57,7 @@ class ArtifactFormat(str, enum.Enum):
 class Project(Base):
     """Project model for organizing synthetic data generation projects."""
     __tablename__ = "projects"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False, index=True)
@@ -74,9 +75,10 @@ class Project(Base):
 class Source(Base):
     """Source data definition for synthetic data generation."""
     __tablename__ = "sources"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
     kind = Column(Enum(SourceKind), nullable=False, index=True)
     storage_uri = Column(String(2048), nullable=False)
     checksum = Column(String(64), nullable=True)  # SHA-256 hash
@@ -89,9 +91,10 @@ class Source(Base):
 class Request(Base):
     """Synthetic data generation request."""
     __tablename__ = "requests"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
     type = Column(Enum(RequestType), nullable=False, index=True)
     status = Column(Enum(RequestStatus), default=RequestStatus.PENDING, nullable=False, index=True)
     seed = Column(Integer, nullable=True)
@@ -109,9 +112,10 @@ class Request(Base):
 class Config(Base):
     """Configuration for synthetic data generation."""
     __tablename__ = "configs"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    request_id = Column(UUID(as_uuid=True), ForeignKey("requests.id"), nullable=False, index=True)
+    request_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.requests.id"), nullable=False, index=True)
     version = Column(Integer, nullable=False, default=1)
     body_json = Column(JSONB, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -123,9 +127,10 @@ class Config(Base):
 class Artifact(Base):
     """Generated synthetic data artifact."""
     __tablename__ = "artifacts"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    request_id = Column(UUID(as_uuid=True), ForeignKey("requests.id"), nullable=False, index=True)
+    request_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.requests.id"), nullable=False, index=True)
     format = Column(Enum(ArtifactFormat), nullable=False, index=True)
     storage_uri = Column(String(2048), nullable=False)
     size_bytes = Column(BigInteger, nullable=False, default=0)
@@ -138,9 +143,10 @@ class Artifact(Base):
 class ApiKey(Base):
     """API key for project access control."""
     __tablename__ = "api_keys"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     hashed_key = Column(String(255), nullable=False, unique=True, index=True)
     scopes = Column(ARRAY(String), default=list, nullable=False)
@@ -153,10 +159,11 @@ class ApiKey(Base):
 class AuditEvent(Base):
     """Audit log for tracking user actions."""
     __tablename__ = "audit_events"
+    __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor = Column(String(255), nullable=False, index=True)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=True, index=True)
     action = Column(String(255), nullable=False, index=True)
     payload_json = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
