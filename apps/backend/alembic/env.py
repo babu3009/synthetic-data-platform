@@ -19,8 +19,12 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 from app.db.base import Base, SCHEMA_NAME  # noqa
 from app.db import models  # noqa - ensure models are imported
+from app.core.config import settings  # noqa
 
 target_metadata = Base.metadata
+
+# Override database URL from settings
+config.set_main_option("sqlalchemy.url", settings.get_database_url())
 
 # Specify the schema to use
 version_table_schema = SCHEMA_NAME
@@ -51,6 +55,9 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         version_table_schema=version_table_schema,
         include_schemas=True,
+        include_object=lambda obj, name, type_, reflected, compare_to: (
+            obj.schema == SCHEMA_NAME if hasattr(obj, 'schema') else True
+        ),
     )
 
     with context.begin_transaction():
@@ -67,6 +74,9 @@ def do_run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         version_table_schema=version_table_schema,
         include_schemas=True,
+        include_object=lambda obj, name, type_, reflected, compare_to: (
+            obj.schema == SCHEMA_NAME if hasattr(obj, 'schema') else True
+        ),
     )
 
     with context.begin_transaction():
