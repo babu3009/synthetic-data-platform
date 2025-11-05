@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List
+from uuid import UUID
+
+from typing import Any, Dict, List
+from sqlalchemy.orm import Session
+
+from app.db.session import SessionLocal
+from app.db.models import Request, RequestStatus, RequestType, Artifact, ArtifactFormat
+from app.services.flat import generate_to_artifacts
+from app.services.storage import get_storage
+
+
+def run_flat_job(request_id: str) -> None:
+    """
+    RQ worker job: generate flat artifacts for the given request id.
+
+    Transitions:
+    - PENDING -> RUNNING -> COMPLETED
+    - PENDING/RUNNING -> FAILED on exception
+    """
+    # Use sync session within RQ worker
+    session: Session = SessionLocal()
+    try:
+        rid = UUID(request_id)
+        req: Request | None = session.get(Request, rid)
+        if not req:
+            return
+        # Avoid InstrumentedAttribute comparison issues
+        if str(getattr(req, "type", "")) != RequestType.FLAT:
+            return
+
+        now = datetime.now(timezone.utc)
+        req_obj: Any = req
+        req_obj.status = RequestStatus.RUNNING
+        req_obj.started_at = now
+        session.add(req_obj)
+        session.commit()
+        session.refresh(req_obj)
+
+        params: Dict[str, Any] = {}
+        raw_params = getattr(req_obj, "params_json", None)
+        if isinstance(raw_params, dict):
+            params = raw_params
+        schema = params.get("schema") or params.get("config")
+        if not schema:
+            raise ValueError("Missing schema in request params_json")
+        total_rows = int(params.get("rows", 1000))
+        formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value])
+        chunk_size = int(params.get("chunk_size", 50_000))
+
+        tmp_dir = Path("storage/tmp") / request_id
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
+        paths, stats = generate_to_artifacts(
+            target_dir=tmp_dir,
+            schema=schema,
+            total_rows=total_rows,
+            formats=formats,
+            chunk_size=chunk_size,
+        )
+
+        storage = get_storage()
+        for p in paths:
+            object_name = f"requests/{request_id}/{p.name}"
+            stored = storage.put_file(p, object_name)
+            fmt = ArtifactFormat(p.suffix.replace('.', '').lower())
+            art = Artifact(
+                request_id=rid,
+                format=fmt,
+                storage_uri=stored.uri,
+                size_bytes=stored.size,
+            )
+            session.add(art)
+
+        # persist stats into params_json["stats"]
+        new_params = dict(params)
+        new_params["stats"] = stats
+        req_obj.params_json = new_params
+        req_obj.status = RequestStatus.COMPLETED
+        req_obj.finished_at = datetime.now(timezone.utc)
+        session.add(req_obj)
+        session.commit()
+
+    except Exception as e:  # pragma: no cover
+        try:
+            req2 = session.get(Request, UUID(request_id))
+            if req2:
+                req2_obj: Any = req2
+                params2: Dict[str, Any] = {}
+                raw = getattr(req2_obj, "params_json", None)
+                if isinstance(raw, dict):
+                    params2 = dict(raw)
+                params2["error"] = str(e)
+                req2_obj.params_json = params2
+                req2_obj.status = RequestStatus.FAILED
+                req2_obj.finished_at = datetime.now(timezone.utc)
+                session.add(req2_obj)
+                session.commit()
+        finally:
+            # swallow exception so worker doesn't crash
+            pass
+    finally:
+        session.close()

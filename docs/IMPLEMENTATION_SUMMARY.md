@@ -80,6 +80,20 @@ Created RESTful API endpoints following best practices:
 
 **Location**: `apps/backend/app/api/api_v1/endpoints/` (projects.py, requests.py, artifacts.py)
 
+### 5.1 Flat data generation – new API endpoints
+
+Added flat-generation endpoints for previewing and starting flat jobs:
+
+- `POST /api/v1/flat/preview` – returns the first 100 rows based on a provided flat schema; deterministic by seed.
+- `POST /api/v1/requests/{request_id}:start` – runs flat generation synchronously for now, writes artifacts, uploads to storage (MinIO/local), persists artifacts and per-column stats, and marks the request as completed.
+
+Implementation:
+
+- Routers: `apps/backend/app/api/api_v1/endpoints/flat.py` (registered under `/flat` and `/requests`).
+- Services: `apps/backend/app/services/flat.py` (generation + stats), `writers.py` (CSV/JSONL/Parquet/XLSX), `storage.py` (MinIO/local abstraction).
+
+Task doc: `docs/tasks/2025-11-05-flat-endpoints.md`.
+
 ### 6. Database Scripts
 
 #### Seeding Script
@@ -214,8 +228,13 @@ apps/backend/
 │   │       ├── endpoints/
 │   │       │   ├── projects.py    # ✅ NEW
 │   │       │   ├── requests.py    # ✅ NEW
-│   │       │   └── artifacts.py   # ✅ NEW
+│   │       │   ├── artifacts.py   # ✅ NEW
+│   │       │   └── flat.py        # ✅ NEW (flat preview + start)
 │   │       └── api.py             # ✅ Updated with new routers
+│   ├── services/
+│   │   ├── flat.py                 # ✅ NEW (flat generation + stats)
+│   │   ├── writers.py              # ✅ NEW (CSV/JSONL/Parquet/XLSX)
+│   │   └── storage.py              # ✅ NEW (MinIO/local storage)
 │   ├── crud/
 │   │   ├── base.py            # ✅ NEW
 │   │   ├── project.py         # ✅ NEW

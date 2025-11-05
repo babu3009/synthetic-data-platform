@@ -5,7 +5,7 @@ annotated-types==0.7.0
 anyio==4.11.0
 async-timeout==5.0.1
 asyncpg==0.30.0
-backports.asyncio.runner==1.2.0
+backports.asyncio.runner==1.2.0; python_version < "3.11"
 certifi==2025.10.5
 click==8.1.8
 colorama==0.4.6
@@ -38,3 +38,9 @@ tomli==2.3.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.38.0
+Faker==25.9.1
+redis==5.0.8
+rq==1.16.2
+minio==7.2.9
+pyarrow==17.0.0
+openpyxl==3.1.5
