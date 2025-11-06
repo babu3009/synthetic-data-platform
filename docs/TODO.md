@@ -70,6 +70,23 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [ ] Telemetry ingestion and storage
   - Add backend endpoints or logging to accept telemetry events from the frontend and store/aggregate them for UX analysis.
 
+### LLM Client & Adapters
+
+- [ ] Connectivity probes (real)
+  - Replace heuristic `probe()` implementations with targeted health checks per provider (e.g., list models or lightweight ping), with retry and timeout tuning.
+- [ ] Model discovery endpoints
+  - Implement real `:probe` and `:discover-models` handlers in admin routes using decrypted credentials; persist discovered models with metadata.
+- [ ] Scoring logic upgrade
+  - Replace heuristic `suggest_providers` ranking with prompt- or rule-based scoring that considers data types, PII tags, and context window. Add tunables.
+- [ ] Local-first preference toggle
+  - Add config to prefer local adapters (Ollama/LM Studio) when reachable; otherwise fall back to remote providers.
+- [ ] Multi-credential selection
+  - Support multiple credentials per provider and selection policy (by project, by tag/region, round-robin).
+- [ ] Caching and rate-limit guards
+  - Cache probe/model lists per provider and respect provider-specific rate limits. Add circuit-breaker behavior on repeated failures.
+- [ ] Integration tests
+  - Add tests that decrypt credentials and exercise factory with mocked HTTP across adapters; include negative cases (disabled provider, bad key).
+
 - [ ] Providers save endpoint
   - Implement/confirm `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` and align with frontend contract.
 - [ ] Validate endpoint

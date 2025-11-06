@@ -8,8 +8,6 @@ conda activate conda-synthetic-data
 ```
 
 ### Deactivation
-```powershell
-conda deactivate
 ```
 
 ### Check Status

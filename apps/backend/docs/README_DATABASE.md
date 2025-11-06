@@ -261,6 +261,27 @@ Example payload:
 }
 ```
 
+### LLM Client Factory (internal)
+
+Code can resolve a project-scoped LLM client with decrypted credentials via:
+
+```python
+from app.services.llm import LLMClientFactory
+res = await LLMClientFactory.get_for_project(db_session, project_id)
+if res:
+    client, cfg = res
+    ok, msg = await client.probe()
+    suggestion = await client.suggest_providers(
+        columns=[{"name": "email", "dtype": "text", "description": "customer email"}],
+        model=cfg.model_name,
+        temperature=cfg.temperature,
+        top_p=cfg.top_p,
+        max_tokens=cfg.max_tokens,
+    )
+```
+
+Adapters available: OpenAI, Anthropic, Ollama, LM Studio. Returns `None` if disabled or misconfigured. See `apps/backend/docs/ENVIRONMENT.md` for configuring encryption keys.
+
 ### Rules Validation (On-demand)
 - `POST /api/v1/validate` – Runs validations without persistence; returns normalized rules and a compact report for `sample` and `final` datasets.
 
