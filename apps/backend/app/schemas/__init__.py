@@ -35,6 +35,9 @@ __all__ = [
     "CanonicalSchema",
     "SchemaResponse",
     "SourceUploadResponse",
+    "InferProvidersRequest",
+    "InferProvidersResponse",
+    "Suggestion",
 ]
 
 from .artifact import (
@@ -78,4 +81,9 @@ from .schema import (
     CanonicalSchema,
     SchemaResponse,
     SourceUploadResponse,
+)
+from .infer import (
+    InferProvidersRequest,
+    InferProvidersResponse,
+    Suggestion,
 )

@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.db.models import Request, RequestStatus, RequestType, Artifact, ArtifactFormat, Project
 from app.services.flat import generate_to_artifacts
 from app.services.storage import get_storage
+from app.services.report import create_html_report
 from app.services.notify import post_run_status
 from app.observability import get_tracer, REQUESTS_COMPLETED, REQUESTS_FAILED
 
@@ -30,117 +31,149 @@ def run_flat_job(request_id: str) -> None:
     try:
         tracer = get_tracer(__name__)
         with tracer.start_as_current_span("flat_job"):
-        rid = UUID(request_id)
-        req: Request | None = session.get(Request, rid)
-        if not req:
-            return
-        # Avoid InstrumentedAttribute comparison issues
-        if str(getattr(req, "type", "")) != RequestType.FLAT:
-            return
+            rid = UUID(request_id)
+            req: Request | None = session.get(Request, rid)
+            if not req:
+                return
+            # Avoid InstrumentedAttribute comparison issues
+            if str(getattr(req, "type", "")) != RequestType.FLAT:
+                return
 
-        now = datetime.now(timezone.utc)
-        req_obj: Any = req
-        req_obj.status = RequestStatus.RUNNING
-        req_obj.started_at = now
-        session.add(req_obj)
-        session.commit()
-        session.refresh(req_obj)
+            now = datetime.now(timezone.utc)
+            req_obj: Any = req
+            req_obj.status = RequestStatus.RUNNING
+            req_obj.started_at = now
+            session.add(req_obj)
+            session.commit()
+            session.refresh(req_obj)
 
-        # Notify RUNNING
-        proj = session.get(Project, getattr(req_obj, "project_id", None))
-        webhook = getattr(proj, "webhook_run_status_url", None) if proj else None
-        job = get_current_job()
-        if job is not None:
-            job.meta["status"] = "running"
-            job.meta["progress"] = 0
-            job.save_meta()
-        post_run_status(
-            webhook,
-            {
-                "project_id": str(getattr(req_obj, "project_id", "")),
-                "request_id": request_id,
-                "status": "running",
-                "progress": 0,
-            },
-        )
-
-        params: Dict[str, Any] = {}
-        raw_params = getattr(req_obj, "params_json", None)
-        if isinstance(raw_params, dict):
-            params = raw_params
-        schema = params.get("schema") or params.get("config")
-        if not schema:
-            raise ValueError("Missing schema in request params_json")
-        total_rows = int(params.get("rows", 1000))
-        formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value])
-        chunk_size = int(params.get("chunk_size", 50_000))
-        outputs: Dict[str, Any] = params.get("outputs", {}) if isinstance(params.get("outputs"), dict) else {}
-        db_writeback = outputs.get("db") if isinstance(outputs.get("db"), dict) else None
-        kafka_publish = outputs.get("kafka") if isinstance(outputs.get("kafka"), dict) else None
-
-        tmp_dir = Path("storage/tmp") / request_id
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-
-        paths, stats = generate_to_artifacts(
-            target_dir=tmp_dir,
-            schema=schema,
-            total_rows=total_rows,
-            formats=formats,
-            chunk_size=chunk_size,
-            db_writeback=db_writeback,
-            kafka_publish=kafka_publish,
-        )
-
-        # Midway progress
-        if job is not None:
-            job.meta["progress"] = 90
-            job.save_meta()
-        post_run_status(
-            webhook,
-            {
-                "project_id": str(getattr(req_obj, "project_id", "")),
-                "request_id": request_id,
-                "status": "running",
-                "progress": 90,
-            },
-        )
-
-        storage = get_storage()
-        for p in paths:
-            object_name = f"requests/{request_id}/{p.name}"
-            stored = storage.put_file(p, object_name)
-            fmt = ArtifactFormat(p.suffix.replace('.', '').lower())
-            art = Artifact(
-                request_id=rid,
-                format=fmt,
-                storage_uri=stored.uri,
-                size_bytes=stored.size,
+            # Notify RUNNING
+            proj = session.get(Project, getattr(req_obj, "project_id", None))
+            webhook = getattr(proj, "webhook_run_status_url", None) if proj else None
+            job = get_current_job()
+            if job is not None:
+                job.meta["status"] = "running"
+                job.meta["progress"] = 0
+                job.save_meta()
+            post_run_status(
+                webhook,
+                {
+                    "project_id": str(getattr(req_obj, "project_id", "")),
+                    "request_id": request_id,
+                    "status": "running",
+                    "progress": 0,
+                },
             )
-            session.add(art)
 
-    # persist stats into params_json["stats"]
-        new_params = dict(params)
-        new_params["stats"] = stats
-        req_obj.params_json = new_params
-        req_obj.status = RequestStatus.COMPLETED
-        req_obj.finished_at = datetime.now(timezone.utc)
-        session.add(req_obj)
-        session.commit()
+            params: Dict[str, Any] = {}
+            raw_params = getattr(req_obj, "params_json", None)
+            if isinstance(raw_params, dict):
+                params = raw_params
+            schema = params.get("schema") or params.get("config")
+            if not schema:
+                raise ValueError("Missing schema in request params_json")
+            total_rows = int(params.get("rows", 1000))
+            formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value])
+            chunk_size = int(params.get("chunk_size", 50_000))
+            outputs: Dict[str, Any] = params.get("outputs", {}) if isinstance(params.get("outputs"), dict) else {}
+            db_writeback = outputs.get("db") if isinstance(outputs.get("db"), dict) else None
+            kafka_publish = outputs.get("kafka") if isinstance(outputs.get("kafka"), dict) else None
 
-        # Notify COMPLETED
-        if job is not None:
-            job.meta["status"] = "completed"
-            job.meta["progress"] = 100
-            job.save_meta()
-        post_run_status(
-            webhook,
-            {
-                "project_id": str(getattr(req_obj, "project_id", "")),
-                "request_id": request_id,
-                "status": "completed",
-                "progress": 100,
-            },
-        )
+            tmp_dir = Path("storage/tmp") / request_id
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+
+            paths, stats = generate_to_artifacts(
+                target_dir=tmp_dir,
+                schema=schema,
+                total_rows=total_rows,
+                formats=formats,
+                chunk_size=chunk_size,
+                db_writeback=db_writeback,
+                kafka_publish=kafka_publish,
+            )
+
+            # Midway progress
+            if job is not None:
+                job.meta["progress"] = 90
+                job.save_meta()
+            post_run_status(
+                webhook,
+                {
+                    "project_id": str(getattr(req_obj, "project_id", "")),
+                    "request_id": request_id,
+                    "status": "running",
+                    "progress": 90,
+                },
+            )
+
+            storage = get_storage()
+            uploaded_artifacts: List[Dict[str, Any]] = []
+            for p in paths:
+                object_name = f"requests/{request_id}/{p.name}"
+                stored = storage.put_file(p, object_name)
+                fmt = ArtifactFormat(p.suffix.replace('.', '').lower())
+                art = Artifact(
+                    request_id=rid,
+                    format=fmt,
+                    storage_uri=stored.uri,
+                    size_bytes=stored.size,
+                )
+                session.add(art)
+                uploaded_artifacts.append({
+                    "table": None,
+                    "format": fmt.value,
+                    "uri": stored.uri,
+                    "size": stored.size,
+                })
+
+            # Generate and upload HTML report (best-effort)
+            try:
+                summary: Dict[str, Any] = {
+                    "rows": total_rows,
+                    "stats": stats,
+                }
+                report_path = create_html_report(
+                    request_id=str(request_id),
+                    target_dir=tmp_dir,
+                    schema=schema if isinstance(schema, dict) else None,
+                    summary=summary,
+                    artifacts=uploaded_artifacts,
+                    samples=None,
+                )
+                stored_report = storage.put_file(report_path, f"requests/{request_id}/report.html")
+                report_art = Artifact(
+                    request_id=rid,
+                    format=ArtifactFormat.HTML,
+                    storage_uri=stored_report.uri,
+                    size_bytes=stored_report.size,
+                )
+                session.add(report_art)
+            except Exception:
+                pass
+
+            # persist stats into params_json["stats"]
+            new_params = dict(params)
+            new_params["stats"] = stats
+            req_obj.params_json = new_params
+            req_obj.status = RequestStatus.COMPLETED
+            req_obj.finished_at = datetime.now(timezone.utc)
+            session.add(req_obj)
+            session.commit()
+
+            # Notify COMPLETED
+            if job is not None:
+                job.meta["status"] = "completed"
+                job.meta["progress"] = 100
+                job.save_meta()
+            post_run_status(
+                webhook,
+                {
+                    "project_id": str(getattr(req_obj, "project_id", "")),
+                    "request_id": request_id,
+                    "status": "completed",
+                    "progress": 100,
+                },
+            )
 
         # Metrics: completed
         try:

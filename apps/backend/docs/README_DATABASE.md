@@ -135,10 +135,31 @@ See `apps/backend/docs/SECURITY.md` for auth model, scopes, and roles.
 - `GET /api/v1/requests/{request_id}/artifacts/{id}` - Get specific artifact
 
 ### Providers & PII
-- `POST /api/v1/projects/{project_id}/infer/providers` – Bulk provider suggestions for an entity schema.
+- `POST /api/v1/projects/{project_id}/infer/providers` – Bulk provider suggestions for a set of columns (RBAC/Scopes enforced).
+- `POST /api/v1/infer/providers` – Non-scoped alias for suggestions when project context is not required.
 - `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` – Save per-entity provider configuration (PII flags, subtypes, and provider configs).
 
-Example payloads are available in `docs/tasks/2025-11-06-frontend-integration-notes.md`.
+Request body for infer endpoints:
+
+```json
+{
+  "columns": [
+    {"table": "customers", "column": "id", "dtype": "uuid"},
+    {"table": "customers", "column": "email", "dtype": "text"},
+    {"table": "orders", "column": "amount", "dtype": "numeric"}
+  ],
+  "llm": {"enabled": false, "provider": "openai", "model": "gpt-4o-mini"}
+}
+```
+
+Fields:
+- `columns.*.dtype` and `columns.*.description` are optional hints that help heuristics.
+- `llm` is optional; when enabled and credentials are present, ambiguous confidences may be nudged slightly. Supported providers: `openai`, `anthropic`, `ollama`, `lmstudio`.
+
+Environment variables for LLMs (optional):
+- `OPENAI_API_KEY` for OpenAI
+- `ANTHROPIC_API_KEY` for Anthropic
+- Local providers (`ollama`, `lmstudio`) assume their default local endpoints if selected.
 
 #### Example: Infer Providers (curl)
 
@@ -146,13 +167,11 @@ Example payloads are available in `docs/tasks/2025-11-06-frontend-integration-no
 curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/providers" \
   -H "Content-Type: application/json" \
   -d '{
-    "tables": [{
-      "name": "customers",
-      "columns": [
-        {"name":"id","type":"uuid","is_pk":true},
-        {"name":"email","type":"text"}
-      ]
-    }]
+    "columns": [
+      {"table": "customers", "column": "id", "dtype": "uuid"},
+      {"table": "customers", "column": "email", "dtype": "text"}
+    ],
+    "llm": {"enabled": false}
   }'
 ```
 

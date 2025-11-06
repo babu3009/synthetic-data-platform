@@ -12,6 +12,7 @@ from app.db.session import SessionLocal
 from app.db.models import Request, RequestStatus, RequestType, Artifact, ArtifactFormat, Project
 from app.services.relational import generate_to_artifacts
 from app.services.storage import get_storage
+from app.services.report import create_html_report
 from app.services.notify import post_run_status
 from app.observability import get_tracer, REQUESTS_STARTED, REQUESTS_COMPLETED, REQUESTS_FAILED
 
@@ -85,6 +86,7 @@ def run_relational_job(request_id: str) -> None:
 
             storage = get_storage()
             # Upload per-table artifacts and record
+            uploaded_artifacts: List[Dict[str, Any]] = []
             recorded: set[str] = set()
             for tname, fmap in paths_by_table.items():
                 for fmt, p in fmap.items():
@@ -104,6 +106,12 @@ def run_relational_job(request_id: str) -> None:
                         size_bytes=stored.size,
                     )
                     session.add(art)
+                    uploaded_artifacts.append({
+                        "table": tname,
+                        "format": fmt,
+                        "uri": stored.uri,
+                        "size": stored.size,
+                    })
 
             # Midway progress
             if job is not None:
@@ -118,6 +126,37 @@ def run_relational_job(request_id: str) -> None:
                     "progress": 90,
                 },
             )
+
+            # Generate and upload HTML report; persist under params_json["relational_report"],
+            # and record an Artifact with format=html
+            try:
+                # Prepare a minimal summary for the report
+                summary: Dict[str, Any] = {
+                    "tables": list(paths_by_table.keys()),
+                    "rows_per_table": rows_per_table,
+                    "report": report,
+                }
+                # Try to include schema tables if available (for FK graph)
+                schema_obj = schema if isinstance(schema, dict) else {"tables": []}
+                report_path = create_html_report(
+                    request_id=str(request_id),
+                    target_dir=tmp_dir,
+                    schema=schema_obj,
+                    summary=summary,
+                    artifacts=uploaded_artifacts,
+                    samples=None,
+                )
+                stored_report = storage.put_file(report_path, f"requests/{request_id}/report.html")
+                report_art = Artifact(
+                    request_id=rid,
+                    format=ArtifactFormat.HTML,
+                    storage_uri=stored_report.uri,
+                    size_bytes=stored_report.size,
+                )
+                session.add(report_art)
+            except Exception:
+                # Best-effort; continue without blocking completion
+                pass
 
             # Persist report under params_json["relational_report"]
             params_out = dict(params)
