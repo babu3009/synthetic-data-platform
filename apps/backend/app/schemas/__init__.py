@@ -37,7 +37,8 @@ __all__ = [
     "SourceUploadResponse",
     "InferProvidersRequest",
     "InferProvidersResponse",
-    "Suggestion",
+    "ProviderSuggestion",
+    "ColumnProviderSuggestions",
     # LLM
     "LLMProvider",
     "LLMProviderCreate",
@@ -97,7 +98,8 @@ from .schema import (
 from .infer import (
     InferProvidersRequest,
     InferProvidersResponse,
-    Suggestion,
+    ProviderSuggestion,
+    ColumnProviderSuggestions,
 )
 from .llm import (
     LLMProvider,

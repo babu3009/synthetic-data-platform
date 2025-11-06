@@ -163,13 +163,40 @@ Environment variables for LLMs (optional):
 
 #### Example: Infer Providers (curl)
 
+Returns a structured per-column response:
+
+```json
+{
+  "results": [
+    {
+      "table": "customers",
+      "column": "email",
+      "suggestions": [
+        {"provider_config": "email", "score": 0.98, "source": "heuristic", "provider": "email", "reasons": ["column looks like email"], "pii": {"tag": "contact.email"}}
+      ]
+    },
+    {
+      "table": "customers",
+      "column": "first_name",
+      "suggestions": [
+        {"provider_config": "first_name", "score": 0.9, "source": "heuristic", "provider": "first_name", "reasons": ["first name detected"], "pii": {"tag": "person.first_name"}}
+      ]
+    }
+  ]
+}
+```
+
+`score` is a normalized confidence (0–1). If project LLM settings are enabled and an LLM client resolves, an additional suggestion with `source: "LLM"` may appear; ordering prefers the LLM suggestion when scores tie.
+
+Request example:
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/providers" \
   -H "Content-Type: application/json" \
   -d '{
     "columns": [
-      {"table": "customers", "column": "id", "dtype": "uuid"},
-      {"table": "customers", "column": "email", "dtype": "text"}
+      {"table": "customers", "column": "email", "dtype": "text", "description": "customer email"},
+      {"table": "customers", "column": "first_name", "dtype": "text"}
     ],
     "llm": {"enabled": false}
   }'

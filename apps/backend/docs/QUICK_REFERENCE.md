@@ -168,3 +168,45 @@ curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/llm-settings" `
 		"max_tokens": 512
 	}'
 ```
+
+### Providers inference (quick)
+
+```powershell
+# Infer per-column providers (heuristic-only example)
+curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/providers" `
+	-H "Content-Type: application/json" `
+	-d '{
+		"columns": [
+			{"table": "customers", "column": "email", "dtype": "text", "description": "customer email"},
+			{"table": "customers", "column": "first_name", "dtype": "text"}
+		],
+		"llm": {"enabled": false}
+	}'
+```
+
+Response shape (per column suggestions):
+
+```json
+{
+	"results": [
+		{
+			"table": "customers",
+			"column": "email",
+			"suggestions": [
+				{
+					"provider_config": "email",
+					"score": 0.98,
+					"source": "heuristic",
+					"provider": "email",
+					"reasons": ["column looks like email"],
+					"pii": {"tag": "contact.email"}
+				}
+			]
+		}
+	]
+}
+```
+
+Notes:
+- If project LLM settings are enabled and a client resolves, an extra `source: "LLM"` suggestion may appear; ranking sorts by score desc and prefers LLM on ties.
+- For a deeper walkthrough and save examples, see `README_DATABASE.md` → Providers & PII.

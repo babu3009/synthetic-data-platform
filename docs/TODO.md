@@ -77,6 +77,12 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [x] Model discovery endpoints
   - Implemented real `:discover-models` for OpenAI, Anthropic, Ollama, LM Studio with per-provider parsing, upsert, diff summary, and audit logging.
   - Follow-ups below extend tests and robustness.
+- [x] Infer/providers ranking & gating
+  - Designed response schema to return per-column `suggestions[]` with `provider_config`, `score`, `source`, `provider`, `reasons`, and `pii`.
+  - Implemented combined inference: heuristic baseline plus optional LLM-refined suggestion; ranking now sorts by score desc and prefers LLM on ties.
+  - Wired LLM gating via `ProjectLLMSetting` + `LLMClientFactory`; if disabled or misconfigured, heuristic-only path is used.
+  - Updated and added tests: adjusted existing infer tests and added `tests/api/test_infer_providers_llm.py` mocking adapters across provider kinds; verified disabled behavior.
+  - Test run green for infer/providers and existing suites.
 - [ ] Scoring logic upgrade
   - Replace heuristic `suggest_providers` ranking with prompt- or rule-based scoring that considers data types, PII tags, and context window. Add tunables.
 - [ ] Local-first preference toggle

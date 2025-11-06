@@ -59,6 +59,80 @@ def infer_providers(
     return base_suggestions
 
 
+def infer_providers_combined(
+    columns: Iterable[ColumnSpec],
+    *,
+    llm_enabled: bool = False,
+    llm_provider: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> List[Dict[str, Any]]:
+    """Return per-column suggestions combining heuristic and (optional) LLM-refined scores.
+
+    Output shape:
+      [{
+        "table": str,
+        "column": str,
+        "suggestions": [
+          {"provider_config": Any, "score": float, "source": "heuristic"|"LLM", "provider": Optional[str], "reasons": [str]?, "pii": dict?}
+        ]
+      }]
+    """
+    # Build heuristic suggestions first (one per column at most)
+    base = []
+    for col in columns:
+        s = _heuristic_suggest(col)
+        if s:
+            base.append(s)
+
+    # Optionally run the LLM refine path to adjust confidences
+    refined = None
+    if llm_enabled:
+        refined = _llm_refine(columns, list(base), LLMConfig(enabled=True, provider=llm_provider, temperature=temperature)) or base
+
+    # Index by (table,column)
+    by_col: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for s in base:
+        key = (s["table"], s["column"])
+        by_col[key] = s
+
+    results: List[Dict[str, Any]] = []
+    for (table, column), hs in by_col.items():
+        suggestions: List[Dict[str, Any]] = []
+        # Heuristic entry
+        suggestions.append({
+            "provider_config": hs.get("providerConfig"),
+            "score": float(hs.get("confidence") or 0.0),
+            "source": "heuristic",
+            "provider": hs.get("provider"),
+            "reasons": hs.get("reasons"),
+            **({"pii": hs.get("pii")} if hs.get("pii") else {}),
+        })
+        # LLM entry if available
+        if refined is not None:
+            rs = next((r for r in refined if r["table"] == table and r["column"] == column), None)
+            if rs:
+                suggestions.append({
+                    "provider_config": rs.get("providerConfig"),
+                    "score": float(rs.get("confidence") or 0.0),
+                    "source": "LLM",
+                    "provider": rs.get("provider"),
+                    "reasons": rs.get("reasons"),
+                    **({"pii": rs.get("pii")} if rs.get("pii") else {}),
+                })
+        # Rank suggestions by score first; for equal scores, prefer LLM over heuristic
+        def sort_key(it: Dict[str, Any]):
+            return (float(it.get("score") or 0.0), 1 if it.get("source") == "LLM" else 0)
+
+        suggestions.sort(key=sort_key, reverse=True)
+        results.append({"table": table, "column": column, "suggestions": suggestions})
+
+    # Preserve input order as best effort
+    order = [(c.table, c.column) for c in columns]
+    order_idx = {k: i for i, k in enumerate(order)}
+    results.sort(key=lambda r: order_idx.get((r["table"], r["column"]), 10**9))
+    return results
+
+
 # --- Heuristics ---
 
 

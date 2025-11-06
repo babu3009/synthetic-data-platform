@@ -23,16 +23,20 @@ class InferProvidersRequest(BaseModel):
     llm: Optional[LLMRequest] = Field(default=None)
 
 
-class Suggestion(BaseModel):
-    table: str
-    column: str
+class ProviderSuggestion(BaseModel):
+    provider_config: Any
+    score: float = Field(..., ge=0.0, le=1.0)
+    source: str = Field(..., description="'heuristic' or 'LLM'")
     provider: Optional[str] = None
-    providerConfig: Any
-    confidence: float
-    rank: int
     reasons: Optional[List[str]] = None
     pii: Optional[dict] = None
 
 
+class ColumnProviderSuggestions(BaseModel):
+    table: str
+    column: str
+    suggestions: List[ProviderSuggestion] = Field(default_factory=list)
+
+
 class InferProvidersResponse(BaseModel):
-    suggestions: List[Suggestion] = Field(default_factory=list)
+    results: List[ColumnProviderSuggestions] = Field(default_factory=list)

@@ -27,19 +27,27 @@ async def test_infer_providers_project_scoped(async_client: AsyncClient, project
     resp = await async_client.post(f"/api/v1/projects/{project.id}/infer/providers", json=payload)
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert "suggestions" in data
-    sugg = data["suggestions"]
-    # Should include entries for our inputs
-    cols = {(s["table"], s["column"]) for s in sugg}
+    assert "results" in data
+    results = data["results"]
+    # Map for easy lookup
+    rc = {(r["table"], r["column"]): r for r in results}
     for expected in [("customers","email"),("customers","first_name"),("customers","phone"),("orders","amount_total"),("orders","iban")]:
-        assert expected in cols
-    # Email should have high confidence
-    email_s = next(s for s in sugg if s["table"]=="customers" and s["column"]=="email")
-    assert email_s["confidence"] >= 0.9
-    # Amount suggestion should be an expression/lognormal-like
-    amt_s = next(s for s in sugg if s["table"]=="orders" and s["column"]=="amount_total")
-    cfg = amt_s["providerConfig"]
-    assert isinstance(cfg, dict) and cfg.get("type") in {"expression","date_range","checksum"}
+        assert expected in rc
+        # Each should have at least one suggestion entry
+        assert isinstance(rc[expected]["suggestions"], list) and rc[expected]["suggestions"], f"No suggestions for {expected}"
+    # Email should have a heuristic suggestion with high score
+    email_sug_list = rc[("customers","email")]["suggestions"]
+    top_email = email_sug_list[0]
+    assert top_email["score"] >= 0.9
+    # Amount suggestion should include expression/lognormal-like provider config in some suggestion
+    amt_sug_list = rc[("orders","amount_total")]["suggestions"]
+    found_amt = False
+    for s in amt_sug_list:
+        cfg = s.get("provider_config")
+        if isinstance(cfg, dict) and cfg.get("type") in {"expression","date_range","checksum"}:
+            found_amt = True
+            break
+    assert found_amt, "Expected amount_total to have expression/date_range/checksum suggestion"
 
 
 @pytest.mark.asyncio
@@ -53,4 +61,9 @@ async def test_infer_providers_alias(async_client: AsyncClient):
     resp = await async_client.post("/api/v1/infer/providers", json=payload)
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["suggestions"]) >= 2
+    assert "results" in data
+    # Ensure both columns present and have suggestions
+    rc = {(r["table"], r["column"]): r for r in data["results"]}
+    assert ("users","uuid") in rc and ("users","url") in rc
+    assert rc[("users","uuid")]["suggestions"]
+    assert rc[("users","url")]["suggestions"]
