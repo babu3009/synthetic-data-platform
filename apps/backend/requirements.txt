@@ -44,3 +44,4 @@ rq==1.16.2
 minio==7.2.9
 pyarrow==17.0.0
 openpyxl==3.1.5
+kafka-python==2.0.2

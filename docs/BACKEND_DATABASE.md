@@ -2,6 +2,10 @@
 
 This document describes the implemented database schema, API endpoints, and setup procedures for the Synthetic Data Platform backend.
 
+Related documentation:
+
+- `apps/backend/docs/OUTPUTS.md` – Configure file artifacts, Postgres upsert, and Kafka publishing
+
 ## Database Schema
 
 ### Models Overview

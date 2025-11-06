@@ -112,3 +112,10 @@ python -c "import sys; print(sys.executable)"
 
 ---
 **Status**: ✅ Ready for Development
+
+### Additional Docs
+- `OUTPUTS.md` - File artifacts, Postgres upsert, Kafka publishing (config and examples)
+
+### Quick Links
+- Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
+- Requests API (estimate/start): see `docs/BACKEND_DATABASE.md`

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from synth.providers.registry import ProviderRegistry
-from app.services.writers import CSVWriter, ParquetWriter
+from app.services.writers import CSVWriter, ParquetWriter, PostgresUpsertWriter, KafkaEventWriter
 from openpyxl import Workbook
 
 
@@ -110,6 +110,8 @@ def generate_to_artifacts(
     seed: int = 0,
     chunk_size: int = 50_000,
     unique_retry_cap: int = 5,
+    db_writeback: Optional[Dict[str, Any]] = None,
+    kafka_publish: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Dict[str, Path]], Dict[str, Any]]:
     """
     Generate relational data according to the provided schema and write artifacts.
@@ -125,6 +127,8 @@ def generate_to_artifacts(
     paths_by_table: Dict[str, Dict[str, Path]] = defaultdict(dict)
     csv_writers: Dict[str, CSVWriter] = {}
     parquet_writers: Dict[str, ParquetWriter] = {}
+    db_writers: Dict[str, PostgresUpsertWriter] = {}
+    kafka_writer: Optional[KafkaEventWriter] = None
 
     # Multi-sheet XLSX
     wb = Workbook(write_only=True)
@@ -154,9 +158,41 @@ def generate_to_artifacts(
         if "parquet" in formats:
             parquet_writers[tname] = ParquetWriter(target_dir / f"{tname}.parquet", columns)
             paths_by_table[tname]["parquet"] = target_dir / f"{tname}.parquet"
+        # optional DB upsert per table
+        if db_writeback and db_writeback.get("enabled"):
+            dsn = db_writeback.get("dsn")
+            base_table = db_writeback.get("table_prefix", "") + tname
+            full_table = db_writeback.get("table", None) or db_writeback.get("table_map", {}).get(tname, base_table)
+            conflict_cols = db_writeback.get("conflict_columns_map", {}).get(tname) or [c["name"] for c in table.get("columns", []) if c.get("pk")]
+            if dsn and full_table and conflict_cols:
+                db_writers[tname] = PostgresUpsertWriter(
+                    dsn=dsn,
+                    table=full_table,
+                    columns=columns,
+                    conflict_columns=conflict_cols,
+                    update_columns=[c for c in columns if c not in conflict_cols],
+                    batch_size=int(db_writeback.get("batch_size", 10_000)),
+                )
         # xlsx sheet
         sheet_map[tname] = wb.create_sheet(tname[:31])  # Excel sheet name max 31 chars
         sheet_map[tname].append(columns)
+
+    # optional Kafka writer once (topic may include table name via prefix if provided later)
+    if kafka_publish and kafka_publish.get("enabled"):
+        brokers = kafka_publish.get("brokers")
+        topic = kafka_publish.get("topic")
+        key_field = kafka_publish.get("key_field")
+        headers = kafka_publish.get("headers") or {}
+        if brokers and topic:
+            kafka_writer = KafkaEventWriter(
+                brokers=brokers,
+                topic=topic,
+                key_field=key_field,
+                extra_headers=headers,
+                linger_ms=int(kafka_publish.get("linger_ms", 20)),
+                batch_size=int(kafka_publish.get("batch_size", 32768)),
+                acks=kafka_publish.get("acks", "all"),
+            )
 
     # Generation
     for tname in order:
@@ -267,6 +303,15 @@ def generate_to_artifacts(
                     csv_writers[tname].write_rows(buf)
                 if tname in parquet_writers:
                     parquet_writers[tname].write_rows(buf)
+                if tname in db_writers:
+                    db_writers[tname].write_rows(buf)
+                if kafka_writer is not None:
+                    # Allow optional table name in payload
+                    if kafka_publish and kafka_publish.get("include_table_name"):
+                        out_buf = [dict(r, __table__=tname) for r in buf]
+                        kafka_writer.write_rows(out_buf)
+                    else:
+                        kafka_writer.write_rows(buf)
                 # xlsx
                 ws = sheet_map[tname]
                 for r in buf:
@@ -279,6 +324,10 @@ def generate_to_artifacts(
         w.close()
     for w in parquet_writers.values():
         w.close()
+    for w in db_writers.values():
+        w.close()
+    if kafka_writer is not None:
+        kafka_writer.close()
 
     xlsx_path = target_dir / "data.xlsx"
     wb.save(xlsx_path)

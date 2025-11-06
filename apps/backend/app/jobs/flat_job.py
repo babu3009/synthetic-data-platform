@@ -71,6 +71,9 @@ def run_flat_job(request_id: str) -> None:
         total_rows = int(params.get("rows", 1000))
         formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value])
         chunk_size = int(params.get("chunk_size", 50_000))
+        outputs: Dict[str, Any] = params.get("outputs", {}) if isinstance(params.get("outputs"), dict) else {}
+        db_writeback = outputs.get("db") if isinstance(outputs.get("db"), dict) else None
+        kafka_publish = outputs.get("kafka") if isinstance(outputs.get("kafka"), dict) else None
 
         tmp_dir = Path("storage/tmp") / request_id
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -81,6 +84,8 @@ def run_flat_job(request_id: str) -> None:
             total_rows=total_rows,
             formats=formats,
             chunk_size=chunk_size,
+            db_writeback=db_writeback,
+            kafka_publish=kafka_publish,
         )
 
         # Midway progress

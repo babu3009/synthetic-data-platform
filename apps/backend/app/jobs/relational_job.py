@@ -62,6 +62,9 @@ def run_relational_job(request_id: str) -> None:
         formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value, ArtifactFormat.PARQUET.value, ArtifactFormat.XLSX.value])
         seed: int = int(params.get("seed", req.seed or 0))
         chunk_size: int = int(params.get("chunk_size", 50_000))
+        outputs: Dict[str, Any] = params.get("outputs", {}) if isinstance(params.get("outputs"), dict) else {}
+        db_writeback = outputs.get("db") if isinstance(outputs.get("db"), dict) else None
+        kafka_publish = outputs.get("kafka") if isinstance(outputs.get("kafka"), dict) else None
 
         tmp_dir = Path("storage/tmp") / request_id
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -73,6 +76,8 @@ def run_relational_job(request_id: str) -> None:
             formats=[f.lower() for f in formats],
             seed=seed,
             chunk_size=chunk_size,
+            db_writeback=db_writeback,
+            kafka_publish=kafka_publish,
         )
 
         storage = get_storage()

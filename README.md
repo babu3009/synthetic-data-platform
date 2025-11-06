@@ -117,6 +117,26 @@ make seed             # Seed database with sample data
 - Rules: split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal), one-click dry-run validation via POST /api/v1/validate with compact report for sample vs final data
 - Outputs & Run: pick output formats (CSV/XLSX/Parquet/JSONL), destination, optional schedule; compute estimates via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`; create and start requests; navigate to Request Detail with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
+#### Outputs: files, Postgres upsert, Kafka events
+- File artifacts: CSV/Parquet/XLSX/JSONL are written chunk-wise and uploaded to MinIO (or local storage fallback) as `s3://<bucket>/requests/{requestId}/...`.
+- Postgres write-back (optional): enable via request `params_json.outputs.db`:
+   - `enabled`: boolean
+   - `dsn`: `postgresql+psycopg2://user:pass@host:5432/db`
+   - `table_map`: object mapping tableName -> target fully-qualified table (or use `table_prefix`)
+   - `conflict_columns_map`: object mapping tableName -> array of conflict columns (defaults to PK columns)
+   - `batch_size` (optional, default 10k)
+   Rows are inserted using `INSERT ... ON CONFLICT (...) DO UPDATE`, batched and wrapped in a single transaction per request.
+- Kafka publish (optional): enable via request `params_json.outputs.kafka`:
+   - `enabled`: boolean
+   - `brokers`: array or comma-separated string
+   - `topic`: topic name
+   - `key_field`: column name to use as partition key (optional)
+   - `headers`: map of string headers (optional)
+   - `linger_ms`, `batch_size`, `acks` (optional producer tuning)
+   Events are JSON-serialized rows; set `include_table_name: true` to add `__table__` to each payload.
+
+   For full configuration details and curl examples, see `apps/backend/docs/OUTPUTS.md`.
+
 #### Accessibility and performance
 - Keyboard navigation:
    - Diagram: Tab to focus columns, Space/Enter toggles PK, E opens editor, Arrow keys move between rows.

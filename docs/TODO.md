@@ -4,7 +4,7 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 ## Frontend
 
-- [ ] ERD diagram UI
+- [x] ERD diagram UI
   - Replace Diagram tab placeholder with an interactive ERD: render tables and PK/FK edges, pan/zoom, auto-layout, and drag for manual positioning. Persist layout per entity.
 - [ ] Per-project wizard routing
   - Change Wizard route to `/wizard/:projectId` instead of query param. Update links and load entities by route param.
@@ -81,7 +81,7 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 ### Requests lifecycle
 
-- [ ] Implement estimate route
+- [x] Implement estimate route
   - `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate` returns `{rows,size_bytes,seconds}` (fields optional by engine).
 - [ ] Implement start route
   - `POST /api/v1/requests/{request_id}:start` transitions status from `pending` to `running` and enqueues processing.
@@ -90,6 +90,9 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 - [x] Add curl examples for Providers, Validate, and Requests lifecycle
   - Update backend docs with examples for infer/save providers, validate, create/estimate/start requests, status, and artifacts.
+
+- [ ] Outputs documentation (DB/Kafka)
+  - Create `apps/backend/docs/OUTPUTS.md` with configuration and curl examples; add links from root README and backend docs.
 
 ---
 
@@ -109,3 +112,16 @@ This list mirrors the in-editor task tracker and can be maintained alongside cod
    - Implemented prefers-color-scheme dark styles and Bootstrap-friendly focus rings without introducing a new CSS framework.
  - [x] Performance optimizations
    - Windowed long column lists in diagram table nodes (paged view) and lazy-loaded the Column Editor modal to reduce initial bundle size.
+
+  - [x] Postgres upsert writer (backend)
+    - Batched `INSERT ... ON CONFLICT DO UPDATE` with single-transaction safety; configurable `table_map`, `conflict_columns_map`, and `batch_size`.
+  - [x] Kafka event writer (backend)
+    - JSON publishing with optional `key_field`, headers, and producer tuning; optional `include_table_name` flag.
+  - [x] Outputs wiring for generators/jobs
+    - Relational and flat generators write to file artifacts and optionally DB/Kafka; jobs pass `params_json.outputs.*` configs.
+  - [x] Estimate endpoint
+    - `POST /api/v1/projects/{project_id}/requests/{id}:estimate` implemented with heuristic estimator service.
+  - [x] E2E MinIO upload test
+    - Generates large relational datasets and uploads CSV/Parquet to MinIO; skips gracefully when MinIO isn’t configured.
+  - [x] README updates
+    - Root README documents Outputs (files/DB/Kafka) and estimate endpoint; cross-links to backend docs.
