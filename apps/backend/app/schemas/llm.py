@@ -119,3 +119,6 @@ class ProbeResponse(BaseModel):
 
 class DiscoverModelsResponse(BaseModel):
     models: List[LLMModelOut] = Field(default_factory=list)
+    added_count: int = 0
+    updated_count: int = 0
+    unchanged_count: int = 0

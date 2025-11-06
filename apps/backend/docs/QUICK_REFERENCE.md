@@ -143,10 +143,18 @@ curl -X POST "http://localhost:8000/api/v1/admin/llm/providers?project_id=${PROJ
 		"is_enabled": true
 	}'
 
-# Upsert provider credentials (payload stored encrypted; masked in audit)
+# Upsert provider credentials (server encrypts at rest; masked in audit logs)
 curl -X POST "http://localhost:8000/api/v1/admin/llm/providers/${PROVIDER_ID}/credentials?project_id=${PROJECT_ID}" `
 	-H "Content-Type: application/json" `
-	-d '{"enc_payload_json": "<encrypted-secret>"}'
+	-d '{
+		"api_key": "sk-...",
+		"org_id": null,
+		"extra": {}
+	}'
+
+# Discover and upsert provider models (returns diff summary)
+curl -X POST "http://localhost:8000/api/v1/admin/llm/providers/${PROVIDER_ID}:discover-models?project_id=${PROJECT_ID}" `
+    -H "Content-Type: application/json"
 
 # Update project-level LLM settings (EDITOR+)
 curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/llm-settings" `

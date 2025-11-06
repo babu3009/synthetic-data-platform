@@ -200,7 +200,7 @@ Endpoints:
 - `GET /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – List models
 - `POST /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – Create model
 - `POST /api/v1/admin/llm/providers/{provider_id}:probe?project_id={project_id}` – Probe provider (no-op stub now)
-- `POST /api/v1/admin/llm/providers/{provider_id}:discover-models?project_id={project_id}` – Discover models (placeholder)
+- `POST /api/v1/admin/llm/providers/{provider_id}:discover-models?project_id={project_id}` – Discover models (fetches from provider, upserts without duplicates, returns diff summary)
 
 Example payloads:
 
@@ -219,7 +219,9 @@ Upsert credentials (server stores encrypted/encoded payload; response never retu
 
 ```json
 {
-  "enc_payload_json": "<encrypted-secret>"
+  "api_key": "sk-...",
+  "org_id": null,
+  "extra": {}
 }
 ```
 
@@ -237,6 +239,19 @@ Create model
 ```
 
 Audit: All admin mutations persist `AuditEvent` with masked values (e.g., secrets replaced by placeholders).
+
+Discover models response includes a diff summary:
+
+```json
+{
+  "models": [
+    {"id":"...","provider_id":"...","name":"gpt-4o-mini","display_name":"gpt-4o-mini","context_tokens":128000,"supports_json":true,"is_default":false,"created_at":"..."}
+  ],
+  "added_count": 2,
+  "updated_count": 1,
+  "unchanged_count": 5
+}
+```
 
 ### Project LLM Settings
 

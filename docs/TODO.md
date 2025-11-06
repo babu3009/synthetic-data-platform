@@ -74,8 +74,9 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 - [ ] Connectivity probes (real)
   - Replace heuristic `probe()` implementations with targeted health checks per provider (e.g., list models or lightweight ping), with retry and timeout tuning.
-- [ ] Model discovery endpoints
-  - Implement real `:probe` and `:discover-models` handlers in admin routes using decrypted credentials; persist discovered models with metadata.
+- [x] Model discovery endpoints
+  - Implemented real `:discover-models` for OpenAI, Anthropic, Ollama, LM Studio with per-provider parsing, upsert, diff summary, and audit logging.
+  - Follow-ups below extend tests and robustness.
 - [ ] Scoring logic upgrade
   - Replace heuristic `suggest_providers` ranking with prompt- or rule-based scoring that considers data types, PII tags, and context window. Add tunables.
 - [ ] Local-first preference toggle
@@ -86,6 +87,20 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Cache probe/model lists per provider and respect provider-specific rate limits. Add circuit-breaker behavior on repeated failures.
 - [ ] Integration tests
   - Add tests that decrypt credentials and exercise factory with mocked HTTP across adapters; include negative cases (disabled provider, bad key).
+  
+#### New Follow-ups (Post Discovery Implementation)
+- [ ] Discovery tests (Anthropic & LM Studio)
+  - Add unit tests mirroring OpenAI/Ollama coverage for Anthropic and LM Studio discovery parsing and diff counters.
+- [ ] Probe endpoint real call
+  - Replace no-op `:probe` with provider-specific light calls (e.g., list models head/ping) and capture latency + error classification.
+- [ ] Error taxonomy & logging
+  - Standardize exceptions for network, auth, rate-limit, and schema parsing; surface structured error codes in probe/discover responses.
+- [ ] Default model policy
+  - Add periodic task or admin action to re-evaluate `is_default` per provider when context windows or recommended base models change.
+- [ ] Caching layer
+  - Cache raw discovery payloads (short TTL) to reduce repeated external calls when multiple admins trigger discovery.
+- [ ] Docs expansion
+  - Extend QUICK_REFERENCE and ENVIRONMENT docs with discovery usage examples (curl), default assignment rules, and troubleshooting (e.g., missing API key).
 
 - [ ] Providers save endpoint
   - Implement/confirm `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` and align with frontend contract.
