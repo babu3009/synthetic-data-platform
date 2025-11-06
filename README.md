@@ -137,6 +137,14 @@ make seed             # Seed database with sample data
 
    For full configuration details and curl examples, see `apps/backend/docs/OUTPUTS.md`.
 
+#### Validation report (HTML)
+- After a run completes, the backend generates a compact HTML validation report per request. It can include:
+   - Summary stats (tables, rows, sizes, rule results)
+   - Foreign key graph (when Graphviz is available)
+   - Sampled per-column histograms (when Matplotlib is available)
+   - Links to generated artifacts
+- The report is stored as an artifact (`format: html`) under the same request folder in object storage and is linked from the Request Detail page.
+
 #### Accessibility and performance
 - Keyboard navigation:
    - Diagram: Tab to focus columns, Space/Enter toggles PK, E opens editor, Arrow keys move between rows.
@@ -169,3 +177,15 @@ make seed             # Seed database with sample data
 - **Backend**: ruff, black, mypy, pytest
 - **Frontend**: ESLint, Prettier, TypeScript
 - **Pre-commit hooks**: Automated code quality checks
+
+## Observability
+
+- Metrics endpoint: `GET http://localhost:8000/metrics` (Prometheus format)
+- Tracing (optional): enable OpenTelemetry OTLP export by setting `OTEL_EXPORTER_OTLP_ENDPOINT` in the backend environment.
+- Custom counters exposed:
+   - `synth_requests_started_total{type=...}`
+   - `synth_requests_completed_total{type=...}`
+   - `synth_requests_failed_total{type=...}`
+   (types include `relational` and `flat`).
+
+If Prometheus/Grafana are configured, the Admin page will link directly to dashboards.

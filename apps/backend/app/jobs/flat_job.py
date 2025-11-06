@@ -14,6 +14,7 @@ from app.db.models import Request, RequestStatus, RequestType, Artifact, Artifac
 from app.services.flat import generate_to_artifacts
 from app.services.storage import get_storage
 from app.services.notify import post_run_status
+from app.observability import get_tracer, REQUESTS_COMPLETED, REQUESTS_FAILED
 
 
 def run_flat_job(request_id: str) -> None:
@@ -27,6 +28,8 @@ def run_flat_job(request_id: str) -> None:
     # Use sync session within RQ worker
     session: Session = SessionLocal()
     try:
+        tracer = get_tracer(__name__)
+        with tracer.start_as_current_span("flat_job"):
         rid = UUID(request_id)
         req: Request | None = session.get(Request, rid)
         if not req:
@@ -115,7 +118,7 @@ def run_flat_job(request_id: str) -> None:
             )
             session.add(art)
 
-        # persist stats into params_json["stats"]
+    # persist stats into params_json["stats"]
         new_params = dict(params)
         new_params["stats"] = stats
         req_obj.params_json = new_params
@@ -138,6 +141,13 @@ def run_flat_job(request_id: str) -> None:
                 "progress": 100,
             },
         )
+
+        # Metrics: completed
+        try:
+            if REQUESTS_COMPLETED is not None:
+                REQUESTS_COMPLETED.labels(type="flat").inc()
+        except Exception:
+            pass
 
     except Exception as e:  # pragma: no cover
         try:
@@ -170,6 +180,12 @@ def run_flat_job(request_id: str) -> None:
                         "error": str(e),
                     },
                 )
+            # Metrics: failed
+            try:
+                if REQUESTS_FAILED is not None:
+                    REQUESTS_FAILED.labels(type="flat").inc()
+            except Exception:
+                pass
         finally:
             # Re-raise to allow RQ Retry policies to apply
             raise

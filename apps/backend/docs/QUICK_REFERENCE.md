@@ -115,7 +115,10 @@ python -c "import sys; print(sys.executable)"
 
 ### Additional Docs
 - `OUTPUTS.md` - File artifacts, Postgres upsert, Kafka publishing (config and examples)
+ - HTML Report - See `OUTPUTS.md` (HTML validation report section)
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
 - Requests API (estimate/start): see `docs/BACKEND_DATABASE.md`
+ - Metrics endpoint: `GET http://localhost:8000/metrics`
+ - Tracing: set `OTEL_EXPORTER_OTLP_ENDPOINT` in backend env

@@ -313,6 +313,7 @@ cd apps/backend && poetry run pytest tests/test_models.py
 - `xlsx`: Excel spreadsheet
 - `parquet`: Apache Parquet
 - `jsonl`: JSON Lines
+ - `html`: Validation report (self-contained HTML)
 
 ## Error Handling
 

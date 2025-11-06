@@ -5,6 +5,7 @@ This guide explains how to configure outputs for generation requests:
 - File artifacts (CSV, Parquet, XLSX, JSONL) uploaded to MinIO or local storage
 - Postgres write-back using batched, transaction-safe upserts
 - Kafka event publishing with optional partition keys and headers
+- HTML validation report artifact per completed run
 
 Use these options independently or together. All configuration lives under `params_json.outputs` on the Request resource.
 
@@ -162,15 +163,36 @@ curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/requests/${REQ
 
 The response includes rough per-table and total estimates. The estimator is heuristic and may vary by engine and configuration.
 
+## HTML Validation Report (Artifact: `html`)
+
+On completion, the backend generates a compact HTML report summarizing the run and validation highlights. The report may include:
+
+- Overall summary (tables, row counts, sizes, elapsed)
+- Foreign key graph (if `graphviz` is installed)
+- Sampled per-column histograms (if `matplotlib` is installed)
+- Links to produced artifacts
+
+Behavior:
+
+- The report is stored alongside other artifacts under `s3://<bucket>/requests/{requestId}/report.html` and recorded in the Artifacts API with `format: "html"`.
+- Sections degrade gracefully when optional dependencies aren’t installed; the report still renders.
+
+Notes:
+
+- If your production DB uses a native enum for `ArtifactFormat`, add a migration to include `html`.
+- The UI Request Detail page links to the report artifact when present.
+
 ## Operational Notes & Troubleshooting
 
 - Ensure target tables exist and your `dsn` user has `INSERT/UPDATE` permissions.
 - Use `+psycopg2` in the DSN for write-back (the upsert path uses a synchronous engine under the hood).
 - If Kafka is unreachable, the job will surface producer errors; check broker addresses, firewall rules, and topic existence.
 - MinIO credentials and bucket configuration are managed by the backend environment; see `ENVIRONMENT.md`.
+- If the HTML report is missing expected sections, check optional dependencies: `graphviz` and `matplotlib`.
 
 ## See Also
 
 - Root README: Outputs overview and Wizard flow
 - `BACKEND_DATABASE.md`: API endpoints for requests and artifacts
 - `QUICK_REFERENCE.md`: Handy commands and quick links
+ - Root README: Observability and HTML report overview

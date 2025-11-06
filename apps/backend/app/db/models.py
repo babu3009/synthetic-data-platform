@@ -53,6 +53,7 @@ class ArtifactFormat(str, enum.Enum):
     XLSX = "xlsx"
     PARQUET = "parquet"
     JSONL = "jsonl"
+    HTML = "html"
 
 
 class Project(Base):

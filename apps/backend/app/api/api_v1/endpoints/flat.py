@@ -19,6 +19,7 @@ from app.core.rq import get_queue
 from app.jobs.flat_job import run_flat_job
 from app.jobs.relational_job import run_relational_job
 from rq import Retry  # type: ignore
+from app.observability import REQUESTS_STARTED
 
 router = APIRouter()
 # Separate router for request-scoped actions under /requests
@@ -83,6 +84,14 @@ async def start_request(
     updated_params["job_id"] = job_id
     updated_params["queue"] = priority
     await crud.request.update(db=db, db_obj=req, obj_in={"params_json": updated_params})
+
+    # Metrics: started
+    try:
+        if REQUESTS_STARTED is not None:
+            typ = "flat" if rtype == RequestType.FLAT else ("relational" if rtype == RequestType.RELATIONAL else str(rtype))
+            REQUESTS_STARTED.labels(type=typ).inc()
+    except Exception:
+        pass
 
     # Return refreshed request
     req = await crud.request.get(db=db, id=request_id)

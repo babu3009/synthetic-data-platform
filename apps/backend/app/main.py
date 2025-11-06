@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api_v1.api import api_router
 from app.jobs.cleanup import cleanup_expired_artifacts
+from app.observability import init_observability
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -26,6 +27,9 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Observability (Prometheus /metrics and OpenTelemetry tracing if configured)
+init_observability(app)
 
 
 @app.get("/health")
