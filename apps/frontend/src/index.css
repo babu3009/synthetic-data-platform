@@ -30,3 +30,8 @@ code {
     color: #e5e7eb; /* light gray */
   }
 }
+
+/* Admin LLM Providers table tweaks */
+td[data-maxwidth="320"] {
+  max-width: 320px;
+}

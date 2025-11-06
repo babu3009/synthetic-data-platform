@@ -6,6 +6,7 @@ import { Navbar as BsNavbar, Nav, Container } from 'react-bootstrap'
 import HomePage from './pages/home_page'
 import WizardPage from './pages/wizard_page'
 import RequestDetailPage from './pages/request_detail_page'
+import LlmProvidersPage from './pages/admin/llm_providers_page'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './index.css'
 
@@ -28,6 +29,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/" element={<HomePage />} />
             <Route path="/wizard" element={<WizardPage />} />
             <Route path="/projects/:projectId/requests/:requestId" element={<RequestDetailPage />} />
+            <Route path="/admin/:projectId/llm-providers" element={<LlmProvidersPage />} />
+            <Route path="/admin/llm-providers" element={<LlmProvidersPage />} />
           </Routes>
         </main>
       </BrowserRouter>
