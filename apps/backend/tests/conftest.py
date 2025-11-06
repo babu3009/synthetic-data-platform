@@ -12,6 +12,7 @@ from app.main import app
 from app.db.base import Base, SCHEMA_NAME as MODEL_SCHEMA
 from app.db.session import get_db
 from app.core.config import settings
+from pathlib import Path
 
 # Ensure PostgreSQL-specific types like JSONB compile on SQLite during tests
 try:
@@ -82,8 +83,12 @@ async def db_session():
             await conn.run_sync(Base.metadata.create_all)
     except Exception:
         await engine.dispose()
-        # Fallback to SQLite
-        db_url = "sqlite+aiosqlite:///./test.db"
+        # Fallback to SQLite file under repo-level testing/databases
+        repo_root = Path(__file__).resolve().parents[3]
+        testing_dir = repo_root / "testing" / "databases"
+        testing_dir.mkdir(parents=True, exist_ok=True)
+        db_file = testing_dir / "test.db"
+        db_url = f"sqlite+aiosqlite:///{db_file.as_posix()}"
         is_sqlite = True
         execution_options = {"schema_translate_map": {schema_name: None}}
         connect_args = {}

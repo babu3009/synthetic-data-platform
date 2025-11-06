@@ -139,6 +139,16 @@ The database schema consists of 7 core models representing the synthetic data ge
 - **Path Parameters**: `project_id` (UUID), `request_id` (UUID)
 - **Response**: `Request` object or 404
 
+#### POST /projects/{project_id}/requests/{request_id}:estimate
+- **Purpose**: Get a quick estimate of rows/size/time before running.
+- **Path Parameters**: `project_id` (UUID), `request_id` (UUID)
+- **Response**: `{ "rows": number, "size_bytes": number, "seconds": number }` (fields optional by engine)
+
+#### POST /requests/{request_id}:start
+- **Purpose**: Start processing a previously created request.
+- **Path Parameters**: `request_id` (UUID)
+- **Response**: Updated `Request` with status transitioning to `running`
+
 ### Artifacts API (`/api/v1/requests/{request_id}/artifacts`)
 
 #### GET /requests/{request_id}/artifacts

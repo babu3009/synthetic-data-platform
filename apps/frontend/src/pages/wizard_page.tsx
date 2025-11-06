@@ -6,6 +6,7 @@ import EntitiesPage from './wizard/entities_page'
 import DiagramPage from './wizard/diagram_page'
 import ProvidersPiiPage from './wizard/providers_pii_page'
 import RulesPage from './wizard/rules_page'
+import OutputsRunPage from './wizard/outputs_run_page'
 
 function WizardInner() {
   const { state, dispatch } = useWizard()
@@ -24,7 +25,7 @@ function WizardInner() {
         onSelect={(k) =>
           dispatch({
             type: 'setActiveTab',
-            tab: ((k as 'entities' | 'diagram' | 'providers' | 'rules' | null) || 'entities'),
+            tab: ((k as 'entities' | 'diagram' | 'providers' | 'rules' | 'run' | null) || 'entities'),
           })
         }
       >
@@ -46,6 +47,11 @@ function WizardInner() {
         <Tab eventKey="rules" title="Rules">
           <div className="pt-3">
             <RulesPage />
+          </div>
+        </Tab>
+        <Tab eventKey="run" title="Outputs & Run">
+          <div className="pt-3">
+            <OutputsRunPage />
           </div>
         </Tab>
       </Tabs>

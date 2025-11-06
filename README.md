@@ -114,6 +114,7 @@ make seed             # Seed database with sample data
 - Diagram: visualize tables and relationships; auto-layout with ReactFlow
 - Providers & PII: per-column provider selection (faker, pattern, sequence, categorical, expression, geo, checksum-valid, reference, empirical), JSON config with inline validation, PII toggle with subtype, bulk auto-suggest via backend with confirmation diff, and save
 - Rules: split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal), one-click dry-run validation via POST /api/v1/validate with compact report for sample vs final data
+- Outputs & Run: pick output formats (CSV/XLSX/Parquet/JSONL), destination, optional schedule; compute estimates via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`; create and start requests; navigate to Request Detail with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
 ### Infrastructure
 - PostgreSQL 15

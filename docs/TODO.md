@@ -50,6 +50,13 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [ ] Fast-refresh cleanup
   - Extract navbar to `components/navbar.tsx`, reintroduce `app.tsx`, and remove no-op placeholders to clear Vite fast-refresh warning.
 
+### Outputs & Run
+
+- [x] Outputs & Run tab UI
+  - Formats, destination, optional schedule, estimate call, and create/start request flow; navigation to Request Detail.
+- [x] Request Detail page
+  - Poll status until terminal state and list/download artifacts; link from Outputs & Run.
+
 ## Backend
 
 - [ ] Persist entities server-side
@@ -71,6 +78,18 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Replace `@app.on_event` startup/shutdown with lifespan context manager and adjust tests/DI accordingly.
 - [ ] Pydantic shadowing fix
   - Resolve SchemaResponse field shadowing warnings and add a regression test.
+
+### Requests lifecycle
+
+- [ ] Implement estimate route
+  - `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate` returns `{rows,size_bytes,seconds}` (fields optional by engine).
+- [ ] Implement start route
+  - `POST /api/v1/requests/{request_id}:start` transitions status from `pending` to `running` and enqueues processing.
+
+### Documentation
+
+- [x] Add curl examples for Providers, Validate, and Requests lifecycle
+  - Update backend docs with examples for infer/save providers, validate, create/estimate/start requests, status, and artifacts.
 
 ---
 

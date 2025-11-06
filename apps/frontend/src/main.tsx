@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import { Navbar as BsNavbar, Nav, Container } from 'react-bootstrap'
 import HomePage from './pages/home_page'
 import WizardPage from './pages/wizard_page'
+import RequestDetailPage from './pages/request_detail_page'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './index.css'
 
@@ -26,6 +27,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/wizard" element={<WizardPage />} />
+            <Route path="/projects/:projectId/requests/:requestId" element={<RequestDetailPage />} />
           </Routes>
         </main>
       </BrowserRouter>
@@ -33,7 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
-function AppNavbar() {
+export function AppNavbar() {
   const location = useLocation()
   return (
     <BsNavbar bg="dark" variant="dark" expand="lg" sticky="top">

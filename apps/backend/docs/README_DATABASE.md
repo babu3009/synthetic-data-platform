@@ -119,6 +119,8 @@ You should see all 23 components marked as ✅.
 - `POST /api/v1/projects/{project_id}/requests/` - Create generation request
 - `GET /api/v1/projects/{project_id}/requests/` - List project requests
 - `GET /api/v1/projects/{project_id}/requests/{id}` - Get specific request
+- `POST /api/v1/projects/{project_id}/requests/{id}:estimate` - Estimate size/time for a request
+- `POST /api/v1/requests/{id}:start` - Start a pending request
 
 ### Artifacts
 - `GET /api/v1/auth/login` – Returns OIDC authorize URL (scaffold)
@@ -137,6 +139,34 @@ See `apps/backend/docs/SECURITY.md` for auth model, scopes, and roles.
 - `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` – Save per-entity provider configuration (PII flags, subtypes, and provider configs).
 
 Example payloads are available in `docs/tasks/2025-11-06-frontend-integration-notes.md`.
+
+#### Example: Infer Providers (curl)
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/providers" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tables": [{
+      "name": "customers",
+      "columns": [
+        {"name":"id","type":"uuid","is_pk":true},
+        {"name":"email","type":"text"}
+      ]
+    }]
+  }'
+```
+
+#### Example: Save Providers (curl)
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/entities/${ENTITY_ID}/providers" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "providers": [
+      {"table":"customers","column":"email","provider":"faker","providerConfig":{"method":"email"},"pii":true,"piiSubtype":"email"}
+    ]
+  }'
+```
 
 ### Rules Validation (On-demand)
 - `POST /api/v1/validate` – Runs validations without persistence; returns normalized rules and a compact report for `sample` and `final` datasets.
@@ -158,6 +188,60 @@ Body shape (abbreviated):
 ```
 
 For more details (normalized types and examples), see `docs/tasks/2025-11-06-frontend-integration-notes.md` and `docs/tasks/2025-11-06-rules-validation.md`.
+
+#### Example: Validate Rules (curl)
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/validate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rules": [
+      {"when":"orders.total > 1000","then":["orders.channel in [''WEB'',''PARTNER'']"]},
+      {"uniqueness": ["customers.email"]}
+    ],
+    "data_sample": {"orders": [{"id": 1, "total": 1500, "channel": "WEB"}]},
+    "data_final": {"orders": [{"id": 2, "total": 1200, "channel": "STORE"}]},
+    "max_violations": 10
+  }'
+```
+
+### Request Lifecycle Examples
+
+#### Create Request
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/requests/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "relational",
+    "seed": 42,
+    "params_json": {"rows": 1000, "tables": ["users","orders"]}
+  }'
+```
+
+#### Estimate Request
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/requests/${REQUEST_ID}:estimate"
+```
+
+#### Start Request
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/requests/${REQUEST_ID}:start"
+```
+
+#### Get Request Status
+
+```bash
+curl "http://localhost:8000/api/v1/projects/${PROJECT_ID}/requests/${REQUEST_ID}"
+```
+
+#### List Artifacts
+
+```bash
+curl "http://localhost:8000/api/v1/requests/${REQUEST_ID}/artifacts"
+```
 
 ## Example API Calls
 
@@ -202,6 +286,8 @@ curl -X POST "http://localhost:8000/api/v1/projects/{project_id}/requests/" \
 cd apps/backend
 poetry run pytest
 ```
+
+Note: When PostgreSQL is unavailable, the test suite falls back to a local SQLite database at the repository root under `testing/databases/test.db`. The test harness creates this path automatically if it doesn't exist.
 
 ### Run Specific Test File
 

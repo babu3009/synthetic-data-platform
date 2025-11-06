@@ -234,12 +234,15 @@ Current features:
 2. **Diagram** – Graph view of tables and relationships (ReactFlow + auto-layout).
 3. **Providers & PII** – Per-column provider selection with JSON config validation, PII toggle/subtypes, and bulk auto-suggest via backend; save per entity.
 4. **Rules** – Split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal) and dry-run validation via `POST /api/v1/validate` returning a compact report for sample vs final datasets.
+5. **Outputs & Run** – Choose output formats and destination, optionally set a schedule, estimate request size/time via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`, create and start requests, then view a dedicated Request Detail page with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
 Planned next steps:
 
 - Persist rules per entity (backend + localStorage fallback)
 - Finalize providers save endpoint contract and remove local fallback
 - Add end-to-end tests around Providers & PII and Rules tabs
+- Tidy Vite fast-refresh warning (extract navbar, restore App shell)
+- Flesh out docs with curl examples for Providers, Validate, and Requests lifecycle (estimate/start/status/artifacts)
 
 ## 📚 Additional Resources
 
