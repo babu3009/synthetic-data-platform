@@ -80,6 +80,29 @@ LLM administration endpoints require OWNER role. These routes use a project-scop
 
 All mutations emit audit events with sensitive values masked (e.g., secret payloads replaced by placeholders). Credentials are write-only and never returned in responses.
 
+## LLM Credentials Encryption
+
+Provider credentials are encrypted at rest and never stored in plaintext. The server accepts a structured payload like:
+
+```json
+{
+	"api_key": "***",
+	"org_id": "...",
+	"extra": {"region": "us-east-1"}
+}
+```
+
+- At write-time, the payload is encrypted and stored in `llm_credentials.enc_payload_json`.
+- At read-time, responses include only a masked value (e.g., `masked_api_key` shows last 4 chars); the full secret is never returned.
+- Audit events record masked values only.
+
+Key management:
+- Local development/production: set `LLM_SECRET_KEY` to a strong secret; if it is not a Fernet key, the service derives one from it.
+- Optional Azure Key Vault: set `KEY_VAULT_URL` and `KEY_VAULT_SECRET_NAME` to fetch the encryption key from Key Vault. If Key Vault is unreachable, the service falls back to `LLM_SECRET_KEY`.
+
+Implementation notes:
+- Preferred cipher is Fernet (cryptography library). If `cryptography` is not installed, a clearly marked, weak fallback is used for dev/test. For secure deployments, ensure `cryptography` is installed and `LLM_SECRET_KEY` (or Key Vault) is configured.
+
 ## Testing
 
 - Use `X-User-Sub: <sub>` header to simulate an authenticated user in tests.

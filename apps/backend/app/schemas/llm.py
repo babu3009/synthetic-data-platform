@@ -51,14 +51,17 @@ class LLMProvider(LLMProviderInDBBase):
 
 
 # Credentials
-class LLMCredentialCreate(BaseModel):
-    enc_payload_json: str = Field(..., description="Encrypted/encoded secret payload")
+class LLMCredentialUpsert(BaseModel):
+    api_key: str = Field(..., min_length=1, description="Provider API key (plaintext; will be encrypted at rest)")
+    org_id: Optional[str] = Field(default=None, description="Optional organization/account identifier")
+    extra: Dict[str, Any] = Field(default_factory=dict, description="Provider-specific extra fields")
 
 
 class LLMCredentialOut(BaseModel):
     id: UUID
     provider_id: UUID
     created_at: datetime
+    masked_api_key: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -16,7 +16,7 @@ from app.schemas.llm import (
     LLMProvider,
     LLMProviderCreate,
     LLMProviderUpdate,
-    LLMCredentialCreate,
+    LLMCredentialUpsert,
     LLMCredentialOut,
     LLMModelCreate,
     LLMModelOut,
@@ -24,6 +24,7 @@ from app.schemas.llm import (
     DiscoverModelsResponse,
 )
 from app.security.auth import get_current_principal, require_project_scope
+from app.utils.crypto import encrypt_json, mask_secret
 
 router = APIRouter()
 
@@ -96,7 +97,7 @@ async def upsert_provider_credentials(
     *,
     db: AsyncSession = Depends(get_db),
     provider_id: UUID,
-    body: LLMCredentialCreate,
+    body: LLMCredentialUpsert,
     principal = Depends(get_current_principal),
     project_id: UUID,
 ):
@@ -105,17 +106,24 @@ async def upsert_provider_credentials(
     if not prov:
         raise HTTPException(status_code=404, detail="Provider not found")
 
+    # Build plaintext payload and encrypt
+    payload = {
+        "api_key": body.api_key,
+        "org_id": body.org_id,
+        "extra": body.extra or {},
+    }
+    cipher = encrypt_json(payload)
+
     existing = await crud_cred.get_by_provider(db, provider_id=provider_id)
     if existing:
-        # Update by replacing payload
-        existing.enc_payload_json = body.enc_payload_json
+        existing.enc_payload_json = cipher
         db.add(existing)
         await db.commit()
         await db.refresh(existing)
         cred = existing
     else:
-        cred = await crud_cred.create(db, obj_in=body.__class__(enc_payload_json=body.enc_payload_json).model_copy(update={}))
-        # Manually set provider if needed (CRUDBase doesn't pass foreign keys not in schema)
+        # Create new and set provider
+        cred = await crud_cred.create(db, obj_in=type("Obj", (), {"model_dump": lambda self=None: {"enc_payload_json": cipher}})())
         cred.provider_id = provider_id
         db.add(cred)
         await db.commit()
@@ -123,11 +131,13 @@ async def upsert_provider_credentials(
 
     actor = getattr(principal, "actor", "unknown")
     db.add(AuditEvent(actor=actor, project_id=project_id, action="llm.credential.upsert", payload_json={
-        "provider_id": str(provider_id), "enc_payload_json": "<secret>"
+        "provider_id": str(provider_id), "api_key": "***" + (body.api_key[-4:] if body.api_key else "")
     }))
     await db.commit()
 
-    return LLMCredentialOut.model_validate(cred)
+    out = LLMCredentialOut.model_validate(cred)
+    out.masked_api_key = mask_secret(body.api_key)
+    return out
 
 
 # Models

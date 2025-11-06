@@ -180,6 +180,25 @@ conda info --envs
 
 ## Conda Environment Management
 
+## LLM Credentials Encryption Environment
+
+For secure storage of LLM provider credentials, configure one of the following options:
+
+1) Local secret key (recommended and simplest)
+- Set an application secret used to derive the encryption key:
+	- `LLM_SECRET_KEY` = a long, random string (32+ chars). If already a valid Fernet key, it will be used as-is; otherwise a Fernet key is derived from it.
+- Ensure the `cryptography` package is installed (it is listed in `requirements.txt`). This enables Fernet encryption.
+
+2) Azure Key Vault (optional)
+- Set these environment variables to fetch the key from Key Vault:
+	- `KEY_VAULT_URL` = e.g., `https://my-vault.vault.azure.net/`
+	- `KEY_VAULT_SECRET_NAME` = the secret name containing your encryption key material
+- The app will attempt Key Vault first; if unavailable, it will fall back to `LLM_SECRET_KEY`.
+
+Notes
+- Responses never return plaintext credentials; only masked values (e.g., last 4 characters) are shown.
+- If `cryptography` is not present, a weak fallback cipher is used for dev/test only. Install `cryptography` for production.
+
 ### Listing Environments
 ```powershell
 # List all conda environments
