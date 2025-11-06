@@ -85,8 +85,8 @@ export function ProviderFormModal({ projectId, show, onHide }: Props) {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} disabled={createMut.isLoading}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={createMut.isLoading}>Create</Button>
+          <Button variant="secondary" onClick={onHide} disabled={createMut.isPending}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={createMut.isPending}>Create</Button>
         </Modal.Footer>
       </Form>
     </Modal>

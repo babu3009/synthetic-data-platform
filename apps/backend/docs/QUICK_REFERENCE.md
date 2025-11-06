@@ -116,6 +116,7 @@ python -c "import sys; print(sys.executable)"
  - HTML Report - See `OUTPUTS.md` (HTML validation report section)
  - Providers Inference - See README_DATABASE.md (Providers & PII section)
  - LLM Admin & Settings - See README_DATABASE.md (LLM Administration & Project LLM Settings)
+ - Frontend LLM Settings UI implemented: project-level toggle, provider/model selection, advanced params (temperature/top_p/max_tokens), guardrails (block PII, allow tool use), and test suggestions panel calling `/api/v1/projects/{projectId}/infer/providers`.
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
@@ -129,6 +130,7 @@ python -c "import sys; print(sys.executable)"
 	 `POST /api/v1/admin/llm/providers/{providerId}:probe?project_id=...`;
 	 `POST /api/v1/admin/llm/providers/{providerId}:discover-models?project_id=...`
  - Project LLM Settings: `GET/PUT /api/v1/projects/{projectId}/llm-settings`
+	 - Frontend page route: `/projects/{projectId}/llm-settings` (OWNER/EDITOR editable; VIEWER read-only)
 
 ### LLM quick examples
 

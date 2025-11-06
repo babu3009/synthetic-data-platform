@@ -1,4 +1,3 @@
-import React from 'react'
 import { Modal, Button, Form, Row, Col, Spinner } from 'react-bootstrap'
 import { useForm } from 'react-hook-form'
 import { useUpsertLlmCredentials } from '../../../hooks/use_llm_admin'
@@ -71,9 +70,9 @@ export function CredentialsModal({ projectId, providerId, show, onHide, masked }
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} disabled={mut.isLoading}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={mut.isLoading}>
-            {mut.isLoading ? <Spinner size="sm" /> : 'Save'}
+          <Button variant="secondary" onClick={onHide} disabled={mut.isPending}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={mut.isPending}>
+            {mut.isPending ? <Spinner size="sm" /> : 'Save'}
           </Button>
         </Modal.Footer>
       </Form>

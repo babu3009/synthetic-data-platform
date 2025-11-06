@@ -38,7 +38,7 @@ export function DiscoverDrawer({ projectId, providerId, show, onHide }: Props) {
         <Offcanvas.Title>Discover Models</Offcanvas.Title>
       </Offcanvas.Header>
       <Offcanvas.Body>
-        {discoverMut.isLoading && (
+        {discoverMut.isPending && (
           <div className="d-flex align-items-center gap-2">
             <Spinner size="sm" /> <span>Fetching models...</span>
           </div>
@@ -46,7 +46,7 @@ export function DiscoverDrawer({ projectId, providerId, show, onHide }: Props) {
         {discoverMut.isError && (
           <div className="text-danger small mb-2">Error discovering models</div>
         )}
-        {!discoverMut.isLoading && models.length === 0 && (
+        {!discoverMut.isPending && models.length === 0 && (
           <div className="text-muted">No models discovered.</div>
         )}
         {models.length > 0 && (
@@ -72,10 +72,10 @@ export function DiscoverDrawer({ projectId, providerId, show, onHide }: Props) {
                       <Button
                         size="sm"
                         variant="outline-primary"
-                        disabled={markDefaultMut.isLoading}
+                        disabled={markDefaultMut.isPending}
                         onClick={() => markDefault(m)}
                       >
-                        {markDefaultMut.isLoading ? '...' : 'Make Default'}
+                        {markDefaultMut.isPending ? '...' : 'Make Default'}
                       </Button>
                     )}
                   </td>

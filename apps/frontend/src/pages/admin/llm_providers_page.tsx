@@ -101,7 +101,7 @@ function ProviderRow({ projectId, provider, onManageCreds, onDiscover }: { proje
         <Form.Check
           type="switch"
           checked={provider.is_enabled}
-          disabled={toggleMut.isLoading}
+          disabled={toggleMut.isPending}
           onChange={onToggle}
           aria-label={`Toggle ${provider.name}`}
         />

@@ -41,6 +41,23 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [ ] CI: frontend pipeline
   - Add CI to lint, type-check, build, and run tests for the frontend. Cache node_modules for speed; report coverage.
 
+### Admin → LLM & Project LLM Settings
+
+- [x] Admin LLM Providers page (OWNER only)
+  - List providers, toggle enable, manage credentials (view-only for non-OWNER), discover models, and probe.
+- [x] React Query hooks and services for admin endpoints
+  - Providers CRUD, credentials upsert, models list/create, probe, and discover-models.
+- [x] File naming policy
+  - Converted component files to snake_case; PascalCase re-export stubs remain for now.
+- [ ] Remove PascalCase re-export stubs
+  - Physically delete `ProviderFormModal.tsx`, `CredentialsModal.tsx`, `DiscoverDrawer.tsx` when safe (Windows case-collision handled).
+- [x] Project → LLM Settings page (OWNER/EDITOR editable)
+  - Enable toggle, provider and model selects (filtered to enabled), advanced tuning (temperature/top_p/max_tokens), guardrails (PII block, tool use), Test Suggestion panel.
+- [ ] Add navbar link to LLM Settings
+  - Optional: surface under a project-scoped menu.
+- [ ] Manual smoke test
+  - Run frontend locally and verify: settings load/save, role-based disables, provider/model filtering, and Test Suggestion results.
+
 - [ ] Rules tab persistence
   - Persist Rules per entity (localStorage + backend endpoints). Prefer backend when available; define typed schema.
 - [ ] Rules & Providers tests
