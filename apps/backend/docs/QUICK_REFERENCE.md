@@ -119,6 +119,7 @@ python -c "import sys; print(sys.executable)"
  - Frontend LLM Settings UI implemented: project-level toggle, provider/model selection, advanced params (temperature/top_p/max_tokens), guardrails (block PII, allow tool use), and test suggestions panel calling `/api/v1/projects/{projectId}/infer/providers`.
  - Backend validation: `PUT /api/v1/projects/{projectId}/llm-settings` enforces `model_id` belongs to `provider_id` (422 on mismatch).
  - Rate limiting: `POST /api/v1/projects/{projectId}/infer/providers` capped at 60/min per project → 429 + audit `llm.infer.rate_limited` when exceeded.
+ - Rate limiting: `POST /api/v1/projects/{projectId}/infer/providers` capped at `INFER_RATE_LIMIT_PER_MINUTE` (env, default 60) per project → 429 + optional audit `llm.infer.rate_limited` (flag `FF_ENABLE_RATE_LIMIT_AUDIT`).
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
@@ -197,7 +198,7 @@ curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/provider
 	}'
 ```
 
-Rate limit response (HTTP 429):
+Rate limit response (HTTP 429) (configurable via `INFER_RATE_LIMIT_PER_MINUTE`):
 ```json
 {"detail":"Rate limit exceeded; try again later"}
 ```
@@ -223,6 +224,25 @@ Response shape (per column suggestions):
 		}
 	]
 }
+```
+
+Tracing & Metrics:
+```powershell
+# Enable OpenTelemetry tracing (OTLP HTTP)
+#set in .env
+ENABLE_TRACING=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=synthetic-data-backend
+
+# Metrics endpoint (always on if ENABLE_METRICS=true)
+curl http://localhost:8000/metrics
+```
+
+Adjust rate limit:
+```powershell
+# Example override to 120 requests per minute
+INFER_RATE_LIMIT_PER_MINUTE=120
+FF_ENABLE_RATE_LIMIT_AUDIT=true
 ```
 
 Notes:

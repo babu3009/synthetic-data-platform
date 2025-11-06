@@ -15,9 +15,10 @@ from app.services.llm import LLMClientFactory
 from sqlalchemy.future import select
 from app.db.models import ProjectLLMSetting, AuditEvent
 from uuid import UUID
+from app.core.config import settings
 
 
-RATE_LIMIT_PER_MINUTE = 60  # requests per project per minute window
+RATE_LIMIT_PER_MINUTE = settings.INFER_RATE_LIMIT_PER_MINUTE  # configurable per env
 
 
 class _SimpleProjectRateLimiter:
@@ -81,10 +82,18 @@ async def infer_providers_for_project(
 
     # Rate limit per project
     if not _project_infer_limiter.check(str(project_id)):
-        # Emit audit event and return 429
-        actor = getattr(principal, "actor", "unknown")
-        db.add(AuditEvent(actor=actor, project_id=pid_uuid, action="llm.infer.rate_limited", payload_json={"limit": RATE_LIMIT_PER_MINUTE}))
-        await db.commit()
+        # Emit audit event and return 429 (feature flag controlled)
+        if settings.FF_ENABLE_RATE_LIMIT_AUDIT:
+            actor = getattr(principal, "actor", "unknown")
+            db.add(
+                AuditEvent(
+                    actor=actor,
+                    project_id=pid_uuid,
+                    action="llm.infer.rate_limited",
+                    payload_json={"limit": RATE_LIMIT_PER_MINUTE},
+                )
+            )
+            await db.commit()
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded; try again later")
 
     cols = [ColumnSpec(table=c.table, column=c.column, dtype=c.dtype, description=c.description) for c in (payload.columns or [])]

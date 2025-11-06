@@ -318,10 +318,31 @@ Error examples:
 
 ### Inference Rate Limiting
 
-Endpoint `POST /api/v1/projects/{project_id}/infer/providers` is limited to 60 requests per minute per project.
-- On exceed returns HTTP 429 with body: `{ "detail": "Rate limit exceeded; try again later" }`
-- Emits audit event `llm.infer.rate_limited` with payload `{"limit":60}`.
-- Implementation is an in-memory limiter; replace with Redis for multi-process deployments.
+Endpoint `POST /api/v1/projects/{project_id}/infer/providers` is limited per project per minute.
+
+Defaults:
+- `INFER_RATE_LIMIT_PER_MINUTE=60` (configurable via environment)
+- When exceeded returns HTTP 429: `{ "detail": "Rate limit exceeded; try again later" }`
+- Audit emission `llm.infer.rate_limited` (payload includes the active numeric limit) is controlled by feature flag `FF_ENABLE_RATE_LIMIT_AUDIT` (default true).
+
+Implementation details:
+- Current limiter is an in-memory dictionary keyed by `(project_id, minute_epoch)`; suitable for single-process dev.
+- For multi-process / horizontal scaling, replace with Redis (e.g., Lua script INCR with TTL) or a token bucket in a shared store.
+- Code location: `app/api/api_v1/endpoints/infer.py` (`_SimpleProjectRateLimiter`).
+
+Override example:
+```powershell
+INFER_RATE_LIMIT_PER_MINUTE=120
+FF_ENABLE_RATE_LIMIT_AUDIT=true
+```
+
+Tracing & Metrics (optional):
+```powershell
+ENABLE_TRACING=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=synthetic-data-backend
+```
+With tracing enabled, request spans can assist in diagnosing inference latency.
 
 ### LLM Client Factory (internal)
 

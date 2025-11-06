@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     
     # CORS settings
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = [
+    # Use plain strings here to avoid AnyHttpUrl validation errors for dev loopback origins.
+    BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:3000",
@@ -69,6 +70,61 @@ class Settings(BaseSettings):
     # Data generation settings
     MAX_ROWS_PER_GENERATION: int = 1_000_000
     DEFAULT_ROWS_PER_GENERATION: int = 1000
+
+    # Inference & rate limiting
+    INFER_RATE_LIMIT_PER_MINUTE: int = 60
+    MAX_INFER_COLUMNS: int = 500
+    DEFAULT_INFER_TEMPERATURE: float = 0.2
+
+    # LLM provider configuration
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_BASE_URL: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_BASE_URL: Optional[str] = None
+    OLLAMA_BASE_URL: Optional[str] = None
+    LMSTUDIO_BASE_URL: Optional[str] = None
+    DEFAULT_LLM_PROVIDER: Optional[str] = None
+    DEFAULT_LLM_MODEL: Optional[str] = None
+
+    # Observability
+    LOG_LEVEL: str = "info"
+    ENABLE_METRICS: bool = True
+    ENABLE_TRACING: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
+    OTEL_EXPORTER_OTLP_PROTOCOL: str = "http"
+    OTEL_SERVICE_NAME: str = "synthetic-data-backend"
+    SENTRY_DSN: Optional[str] = None
+
+    # Audit / retention
+    AUDIT_RETENTION_DAYS: int = 30
+
+    # Security toggles
+    AUTH_DISABLED: bool = False
+    API_KEY_HASH_ALGO: str = "sha256"
+
+    # Redis unified URL
+    REDIS_URL: Optional[str] = None
+
+    # MinIO extras
+    MINIO_SECURE: bool = False
+    MINIO_REGION: Optional[str] = None
+
+    # DB pool tuning
+    DB_POOL_SIZE: int = 5
+    DB_POOL_MAX_OVERFLOW: int = 10
+    DB_CONN_TIMEOUT: int = 10
+
+    # Feature flags
+    FF_ENABLE_DISCOVERY_CACHE: bool = True
+    FF_ENABLE_PROBE_AUDIT: bool = True
+    FF_ENABLE_RATE_LIMIT_AUDIT: bool = True
+
+    # Encryption (future expansion)
+    ENCRYPTION_KEK: Optional[str] = None
+
+    # App identity
+    APP_ENV: str = "local"
+    APP_INSTANCE_ID: str = "dev-1"
 
     # Pydantic v2 settings configuration
     model_config = SettingsConfigDict(
