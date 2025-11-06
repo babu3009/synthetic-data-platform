@@ -24,6 +24,21 @@ Implemented a deterministic, extensible provider framework for synthetic column 
   - `ProviderRegistry.from_config(...)`
   - `PII_CATALOG` with sensible defaults
 
+## Frontend integration (Providers & PII tab)
+
+- Auto-suggest providers:
+  - Endpoint: `POST /api/v1/projects/{project_id}/infer/providers`
+  - Input: current Entity schema (tables + columns); returns an array of per-column suggestions `{ table, column, provider?, providerConfig?, pii?, piiSubtype? }`.
+  - UI shows a confirmation diff before applying changes.
+
+- Save providers:
+  - Endpoint: `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers`
+  - Input: flattened providers list as above; backend persists mapping alongside project/entity.
+
+- Inline validation in UI:
+  - `pattern`: requires `mask`.
+  - `categorical`: `categories[].weight` sum must equal 1.
+
 ## Files added/edited
 - Added
   - `apps/backend/synth/__init__.py`

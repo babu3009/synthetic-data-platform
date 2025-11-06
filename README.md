@@ -109,6 +109,11 @@ make seed             # Seed database with sample data
 - Recharts (charts)
 - ReactFlow (flow diagrams)
 
+#### Wizard features
+- Entities: create/import via DDL or JSON; manual field designer
+- Diagram: visualize tables and relationships; auto-layout with ReactFlow
+- Providers & PII: per-column provider selection (faker, pattern, sequence, categorical, expression, geo, checksum-valid, reference, empirical), JSON config with inline validation, PII toggle with subtype, bulk auto-suggest via backend with confirmation diff, and save
+
 ### Infrastructure
 - PostgreSQL 15
 - Redis 7

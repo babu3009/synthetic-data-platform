@@ -6,7 +6,21 @@ export type Column = {
   nullable: boolean
   regex?: string
   distribution?: string
+  // PII flags
   pii?: boolean
+  piiSubtype?: 'email' | 'phone' | 'address' | 'national_id' | 'credit_card' | 'dob' | 'ip' | 'device'
+  // Provider config
+  provider?:
+    | 'faker'
+    | 'pattern'
+    | 'sequence'
+    | 'categorical'
+    | 'expression'
+    | 'geo'
+    | 'checksum-valid'
+    | 'reference'
+    | 'empirical'
+  providerConfig?: Record<string, unknown>
 }
 
 export type Table = {
@@ -41,7 +55,7 @@ export type WizardState = {
   projectId?: string
   entities: EntitySchema[]
   selectedEntityId?: string
-  activeTab?: 'entities' | 'diagram'
+  activeTab?: 'entities' | 'diagram' | 'providers'
 }
 
 type Action =
@@ -51,10 +65,23 @@ type Action =
   | { type: 'setActiveTab'; tab: WizardState['activeTab'] }
   | { type: 'updateEntity'; id: string; patch: Partial<EntitySchema> }
   | { type: 'updateTable'; entityId: string; tableName: string; patch: Partial<Table> }
+  | { type: 'updateColumn'; entityId: string; tableName: string; columnName: string; patch: Partial<Column> }
   | { type: 'togglePk'; entityId: string; tableName: string; columnName: string }
   | { type: 'upsertRelationship'; entityId: string; rel: Relationship }
   | { type: 'deleteRelationship'; entityId: string; relId: string }
   | { type: 'saveLayout'; entityId: string; layout: Record<string, { x: number; y: number }> }
+  | {
+      type: 'applyProviderSuggestions'
+      entityId: string
+      suggestions: Array<{
+        table: string
+        column: string
+        provider?: Column['provider']
+        providerConfig?: Record<string, unknown>
+        pii?: boolean
+        piiSubtype?: Column['piiSubtype']
+      }>
+    }
 
 function reducer(state: WizardState, action: Action): WizardState {
   switch (action.type) {
@@ -82,6 +109,18 @@ function reducer(state: WizardState, action: Action): WizardState {
       const entities = state.entities.map((e) => {
         if (e.id !== action.entityId) return e
         const tables = e.tables.map((t) => (t.name === action.tableName ? { ...t, ...action.patch } : t))
+        return { ...e, tables, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
+    case 'updateColumn': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const tables = e.tables.map((t) => {
+          if (t.name !== action.tableName) return t
+          const cols = t.columns.map((c) => (c.name === action.columnName ? { ...c, ...action.patch } : c))
+          return { ...t, columns: cols }
+        })
         return { ...e, tables, updatedAt: new Date().toISOString() }
       })
       return { ...state, entities }
@@ -123,6 +162,29 @@ function reducer(state: WizardState, action: Action): WizardState {
       const entities = state.entities.map((e) => (e.id === action.entityId ? { ...e, layout: action.layout, updatedAt: new Date().toISOString() } : e))
       return { ...state, entities }
     }
+    case 'applyProviderSuggestions': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const tables = e.tables.map((t) => {
+          const suggestionsForTable = action.suggestions.filter((s) => s.table === t.name)
+          if (suggestionsForTable.length === 0) return t
+          const cols = t.columns.map((c) => {
+            const s = suggestionsForTable.find((x) => x.column === c.name)
+            if (!s) return c
+            return {
+              ...c,
+              provider: s.provider ?? c.provider,
+              providerConfig: s.providerConfig ?? c.providerConfig,
+              pii: typeof s.pii === 'boolean' ? s.pii : c.pii,
+              piiSubtype: s.piiSubtype ?? c.piiSubtype,
+            }
+          })
+          return { ...t, columns: cols }
+        })
+        return { ...e, tables, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
     default:
       return state
   }
@@ -157,12 +219,17 @@ export function isEntityNameUnique(name: string, entities: EntitySchema[]) {
 }
 
 // Mapping from backend canonical schema -> EntitySchema tables
-export function tablesFromCanonicalSchema(schema: { tables: any[] }): Table[] {
-  const tables = (schema?.tables ?? []).map((t: any) => ({
+type CanonicalColumn = { name: string; dtype: string; nullable: boolean }
+type CanonicalTable = { name: string; columns?: CanonicalColumn[]; pk?: string[]; uniques?: string[][] }
+
+export function tablesFromCanonicalSchema(schema: { tables: CanonicalTable[] }): Table[] {
+  const tables = (schema?.tables ?? []).map((t) => ({
     name: String(t.name),
-    columns: (t.columns ?? []).map((c: any) => ({ name: String(c.name), dtype: String(c.dtype), nullable: Boolean(c.nullable) })),
+    columns: (t.columns ?? []).map((c) => ({ name: String(c.name), dtype: String(c.dtype), nullable: Boolean(c.nullable) })),
     pk: Array.isArray(t.pk) ? t.pk.map(String) : undefined,
-    uniques: Array.isArray(t.uniques) ? t.uniques.map((u: any) => (Array.isArray(u) ? u.map(String) : [])).filter((u: string[]) => u.length > 0) : undefined,
+    uniques: Array.isArray(t.uniques)
+      ? t.uniques.map((u) => (Array.isArray(u) ? u.map(String) : [])).filter((u: string[]) => u.length > 0)
+      : undefined,
   })) as Table[]
   return tables
 }

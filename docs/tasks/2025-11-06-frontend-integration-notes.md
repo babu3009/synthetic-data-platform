@@ -31,6 +31,44 @@ This page captures quick, practical notes so we can wire the UI later with minim
   - GET `/api/v1/requests/{request_id}/artifacts`
   - Returns: array of artifacts `{ id, format: 'csv'|'xlsx'|'parquet'|'jsonl', storage_uri, size_bytes, created_at }`
 
+- Providers: infer suggestions (bulk)
+  - POST `/api/v1/projects/{project_id}/infer/providers`
+  - Body example:
+    ```json
+    {
+      "entity": {
+        "id": "entity-123",
+        "name": "Retail DB",
+        "tables": [
+          { "name": "customers", "columns": [
+            { "name": "email", "dtype": "text", "nullable": false },
+            { "name": "dob", "dtype": "date", "nullable": true }
+          ]}
+        ]
+      }
+    }
+    ```
+  - Response example:
+    ```json
+    {
+      "suggestions": [
+        { "table": "customers", "column": "email", "pii": true, "piiSubtype": "email", "provider": "faker", "providerConfig": {"method":"email"} },
+        { "table": "customers", "column": "dob", "provider": "pattern", "providerConfig": {"mask": "199#-0#-2#"} }
+      ]
+    }
+    ```
+
+- Providers: save per-entity configuration
+  - PUT `/api/v1/projects/{project_id}/entities/{entity_id}/providers`
+  - Body example:
+    ```json
+    {
+      "providers": [
+        { "table": "customers", "column": "email", "pii": true, "piiSubtype": "email", "provider": "faker", "providerConfig": {"method":"email"} }
+      ]
+    }
+    ```
+
 - On-demand validation (no persistence)
   - POST `/api/v1/validate`
   - Body:
