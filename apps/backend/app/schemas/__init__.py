@@ -38,6 +38,18 @@ __all__ = [
     "InferProvidersRequest",
     "InferProvidersResponse",
     "Suggestion",
+    # LLM
+    "LLMProvider",
+    "LLMProviderCreate",
+    "LLMProviderUpdate",
+    "LLMCredentialCreate",
+    "LLMCredentialOut",
+    "LLMModelCreate",
+    "LLMModelOut",
+    "ProjectLLMSettingUpdate",
+    "ProjectLLMSettingOut",
+    "ProbeResponse",
+    "DiscoverModelsResponse",
 ]
 
 from .artifact import (
@@ -86,4 +98,17 @@ from .infer import (
     InferProvidersRequest,
     InferProvidersResponse,
     Suggestion,
+)
+from .llm import (
+    LLMProvider,
+    LLMProviderCreate,
+    LLMProviderUpdate,
+    LLMCredentialCreate,
+    LLMCredentialOut,
+    LLMModelCreate,
+    LLMModelOut,
+    ProjectLLMSettingUpdate,
+    ProjectLLMSettingOut,
+    ProbeResponse,
+    DiscoverModelsResponse,
 )

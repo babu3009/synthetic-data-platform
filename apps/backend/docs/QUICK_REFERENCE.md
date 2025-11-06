@@ -117,6 +117,7 @@ python -c "import sys; print(sys.executable)"
 - `OUTPUTS.md` - File artifacts, Postgres upsert, Kafka publishing (config and examples)
  - HTML Report - See `OUTPUTS.md` (HTML validation report section)
  - Providers Inference - See README_DATABASE.md (Providers & PII section)
+ - LLM Admin & Settings - See README_DATABASE.md (LLM Administration & Project LLM Settings)
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
@@ -124,3 +125,40 @@ python -c "import sys; print(sys.executable)"
  - Metrics endpoint: `GET http://localhost:8000/metrics`
  - Tracing: set `OTEL_EXPORTER_OTLP_ENDPOINT` in backend env
 	- Provider suggestions: `POST /api/v1/projects/{projectId}/infer/providers` or `/api/v1/infer/providers`
+ - LLM Admin (OWNER): `GET/POST/PATCH /api/v1/admin/llm/providers?project_id=...`;
+	 `POST /api/v1/admin/llm/providers/{providerId}/credentials?project_id=...`;
+	 `GET/POST /api/v1/admin/llm/providers/{providerId}/models?project_id=...`;
+	 `POST /api/v1/admin/llm/providers/{providerId}:probe?project_id=...`;
+	 `POST /api/v1/admin/llm/providers/{providerId}:discover-models?project_id=...`
+ - Project LLM Settings: `GET/PUT /api/v1/projects/{projectId}/llm-settings`
+
+### LLM quick examples
+
+```powershell
+# Create an LLM provider (OWNER role; note the project_id query param for RBAC scope)
+curl -X POST "http://localhost:8000/api/v1/admin/llm/providers?project_id=${PROJECT_ID}" `
+	-H "Content-Type: application/json" `
+	-d '{
+		"kind": "openai",
+		"name": "openai",
+		"base_url": "https://api.openai.com/v1",
+		"is_enabled": true
+	}'
+
+# Upsert provider credentials (payload stored encrypted; masked in audit)
+curl -X POST "http://localhost:8000/api/v1/admin/llm/providers/${PROVIDER_ID}/credentials?project_id=${PROJECT_ID}" `
+	-H "Content-Type: application/json" `
+	-d '{"enc_payload_json": "<encrypted-secret>"}'
+
+# Update project-level LLM settings (EDITOR+)
+curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/llm-settings" `
+	-H "Content-Type: application/json" `
+	-d '{
+		"enabled": true,
+		"provider_id": "${PROVIDER_ID}",
+		"model_id": "${MODEL_ID}",
+		"temperature": 0.2,
+		"top_p": 1.0,
+		"max_tokens": 512
+	}'
+```

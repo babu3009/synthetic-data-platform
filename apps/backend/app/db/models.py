@@ -11,6 +11,8 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum,
+    Boolean,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -226,3 +228,79 @@ class ProjectMember(Base):
 
     # Relationships
     project = relationship("Project")
+
+
+# ---------------- LLM Models ---------------- #
+
+
+class LLMProviderKind(str, enum.Enum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
+    LMSTUDIO = "lmstudio"
+    CUSTOM = "custom"
+
+
+class LLMProvider(Base):
+    __tablename__ = "llm_providers"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind = Column(Enum(LLMProviderKind), nullable=False, index=True)
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    base_url = Column(String(1024), nullable=True)
+    is_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    credentials = relationship("LLMCredential", back_populates="provider", cascade="all, delete-orphan")
+    models = relationship("LLMModel", back_populates="provider", cascade="all, delete-orphan")
+
+
+class LLMCredential(Base):
+    __tablename__ = "llm_credentials"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_providers.id"), nullable=False, index=True)
+    enc_payload_json = Column(Text, nullable=False)  # encrypted/encoded secret payload
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    provider = relationship("LLMProvider", back_populates="credentials")
+
+
+class LLMModel(Base):
+    __tablename__ = "llm_models"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_providers.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    display_name = Column(String(255), nullable=False)
+    context_tokens = Column(Integer, nullable=True)
+    supports_json = Column(Boolean, nullable=False, default=False)
+    is_default = Column(Boolean, nullable=False, default=False)
+    metadata_json = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    provider = relationship("LLMProvider", back_populates="models")
+
+
+class ProjectLLMSetting(Base):
+    __tablename__ = "project_llm_settings"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
+    enabled = Column(Boolean, nullable=False, default=False)
+    provider_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_providers.id"), nullable=True, index=True)
+    model_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_models.id"), nullable=True, index=True)
+    temperature = Column(Float, nullable=True)
+    top_p = Column(Float, nullable=True)
+    max_tokens = Column(Integer, nullable=True)
+    guardrails_json = Column(JSONB, nullable=False, default=dict)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    project = relationship("Project")
+    provider = relationship("LLMProvider")
+    model = relationship("LLMModel")

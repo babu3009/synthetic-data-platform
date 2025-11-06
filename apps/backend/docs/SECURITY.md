@@ -72,6 +72,14 @@ Examples:
 - Run request: `run:request` OR role in {EDITOR, OWNER}
 - Read artifacts: `read:artifacts` OR role in {VIEWER, EDITOR, OWNER}
 
+## LLM Admin Access (OWNER)
+
+LLM administration endpoints require OWNER role. These routes use a project-scoped query parameter to establish RBAC context:
+
+- Example: `GET /api/v1/admin/llm/providers?project_id={project_id}`
+
+All mutations emit audit events with sensitive values masked (e.g., secret payloads replaced by placeholders). Credentials are write-only and never returned in responses.
+
 ## Testing
 
 - Use `X-User-Sub: <sub>` header to simulate an authenticated user in tests.

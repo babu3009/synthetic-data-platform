@@ -187,6 +187,80 @@ curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/entities/${ENTI
   }'
 ```
 
+### LLM Administration (OWNER)
+
+LLM providers, credentials, and models are managed via admin endpoints. These routes require the caller to be an OWNER for a project; provide `?project_id=<uuid>` as a query parameter to establish RBAC scope.
+
+Endpoints:
+
+- `GET /api/v1/admin/llm/providers?project_id={project_id}` – List providers
+- `POST /api/v1/admin/llm/providers?project_id={project_id}` – Create provider
+- `PATCH /api/v1/admin/llm/providers/{provider_id}?project_id={project_id}` – Update provider
+- `POST /api/v1/admin/llm/providers/{provider_id}/credentials?project_id={project_id}` – Upsert credentials (secrets masked in audit)
+- `GET /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – List models
+- `POST /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – Create model
+- `POST /api/v1/admin/llm/providers/{provider_id}:probe?project_id={project_id}` – Probe provider (no-op stub now)
+- `POST /api/v1/admin/llm/providers/{provider_id}:discover-models?project_id={project_id}` – Discover models (placeholder)
+
+Example payloads:
+
+Create provider
+
+```json
+{
+  "kind": "openai",
+  "name": "openai",
+  "base_url": "https://api.openai.com/v1",
+  "is_enabled": true
+}
+```
+
+Upsert credentials (server stores encrypted/encoded payload; response never returns the secret):
+
+```json
+{
+  "enc_payload_json": "<encrypted-secret>"
+}
+```
+
+Create model
+
+```json
+{
+  "name": "gpt-4o-mini",
+  "display_name": "GPT-4o Mini",
+  "context_tokens": 128000,
+  "supports_json": true,
+  "is_default": true,
+  "metadata_json": {"family": "gpt", "tier": "standard"}
+}
+```
+
+Audit: All admin mutations persist `AuditEvent` with masked values (e.g., secrets replaced by placeholders).
+
+### Project LLM Settings
+
+Per-project defaults for LLM usage, including selected provider/model and tuning parameters.
+
+Endpoints:
+
+- `GET /api/v1/projects/{project_id}/llm-settings` – Read settings (VIEWER+). Returns defaults when not configured.
+- `PUT /api/v1/projects/{project_id}/llm-settings` – Create/update settings (EDITOR+). Emits `AuditEvent` on change.
+
+Example payload:
+
+```json
+{
+  "enabled": true,
+  "provider_id": "<uuid>",
+  "model_id": "<uuid>",
+  "temperature": 0.2,
+  "top_p": 1.0,
+  "max_tokens": 512,
+  "guardrails_json": {"block_pii": true}
+}
+```
+
 ### Rules Validation (On-demand)
 - `POST /api/v1/validate` – Runs validations without persistence; returns normalized rules and a compact report for `sample` and `final` datasets.
 
