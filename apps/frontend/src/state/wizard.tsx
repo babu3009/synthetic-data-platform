@@ -55,7 +55,7 @@ export type WizardState = {
   projectId?: string
   entities: EntitySchema[]
   selectedEntityId?: string
-  activeTab?: 'entities' | 'diagram' | 'providers'
+  activeTab?: 'entities' | 'diagram' | 'providers' | 'rules'
 }
 
 type Action =

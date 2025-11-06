@@ -5,6 +5,7 @@ import { WizardProvider, useWizard } from '../state/wizard'
 import EntitiesPage from './wizard/entities_page'
 import DiagramPage from './wizard/diagram_page'
 import ProvidersPiiPage from './wizard/providers_pii_page'
+import RulesPage from './wizard/rules_page'
 
 function WizardInner() {
   const { state, dispatch } = useWizard()
@@ -40,6 +41,11 @@ function WizardInner() {
         <Tab eventKey="providers" title="Providers & PII">
           <div className="pt-3">
             <ProvidersPiiPage />
+          </div>
+        </Tab>
+        <Tab eventKey="rules" title="Rules">
+          <div className="pt-3">
+            <RulesPage />
           </div>
         </Tab>
       </Tabs>

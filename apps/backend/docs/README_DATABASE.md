@@ -132,6 +132,33 @@ See `apps/backend/docs/SECURITY.md` for auth model, scopes, and roles.
 - `GET /api/v1/requests/{request_id}/artifacts` - List request artifacts
 - `GET /api/v1/requests/{request_id}/artifacts/{id}` - Get specific artifact
 
+### Providers & PII
+- `POST /api/v1/projects/{project_id}/infer/providers` – Bulk provider suggestions for an entity schema.
+- `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` – Save per-entity provider configuration (PII flags, subtypes, and provider configs).
+
+Example payloads are available in `docs/tasks/2025-11-06-frontend-integration-notes.md`.
+
+### Rules Validation (On-demand)
+- `POST /api/v1/validate` – Runs validations without persistence; returns normalized rules and a compact report for `sample` and `final` datasets.
+
+Body shape (abbreviated):
+
+```json
+{
+  "rules": [
+    {"when":"orders.total > 1000","then":["orders.channel in ['WEB','PARTNER']"]},
+    {"uniqueness": ["customers.email"]},
+    {"distribution": {"product.category": {"A":0.5,"B":0.3,"C":0.2}}},
+    {"temporal": "shipment.promised_date <= shipment.order_date + 2d"}
+  ],
+  "data_sample": {"orders": [{"id":1,"total":1500,"channel":"WEB"}]},
+  "data_final": {"orders": [{"id":2,"total":1200,"channel":"STORE"}]},
+  "max_violations": 10
+}
+```
+
+For more details (normalized types and examples), see `docs/tasks/2025-11-06-frontend-integration-notes.md` and `docs/tasks/2025-11-06-rules-validation.md`.
+
 ## Example API Calls
 
 ### Create a Project

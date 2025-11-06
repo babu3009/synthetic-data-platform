@@ -226,17 +226,20 @@ The GitHub Actions pipeline automatically:
 6. **Data Generators**: Implement synthetic data generation algorithms
 7. **File Processing**: Add support for various data formats (CSV, JSON, Parquet)
 
-## 🎯 Synthetic Data Wizard Implementation
+## 🎯 Synthetic Data Wizard
 
-The frontend includes a prominent placeholder for the synthetic data wizard. Key areas to implement:
+Current features:
 
-1. **Schema Builder**: Visual interface for defining data schemas
-2. **Data Type Configuration**: Field types, constraints, relationships
-3. **Generation Parameters**: Row counts, distribution settings
-4. **Preview & Validation**: Sample data preview before full generation
-5. **Export Options**: Multiple format support (CSV, JSON, Excel, Parquet)
-6. **Progress Tracking**: Real-time generation progress with RQ
-7. **History Management**: Track and replay previous generations
+1. **Entities** – Create/import via DDL or JSON; field designer with types, PK, FK.
+2. **Diagram** – Graph view of tables and relationships (ReactFlow + auto-layout).
+3. **Providers & PII** – Per-column provider selection with JSON config validation, PII toggle/subtypes, and bulk auto-suggest via backend; save per entity.
+4. **Rules** – Split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal) and dry-run validation via `POST /api/v1/validate` returning a compact report for sample vs final datasets.
+
+Planned next steps:
+
+- Persist rules per entity (backend + localStorage fallback)
+- Finalize providers save endpoint contract and remove local fallback
+- Add end-to-end tests around Providers & PII and Rules tabs
 
 ## 📚 Additional Resources
 
