@@ -24,7 +24,7 @@ function WizardInner() {
         onSelect={(k) =>
           dispatch({
             type: 'setActiveTab',
-            tab: ((k as 'entities' | 'diagram' | 'providers' | null) || 'entities'),
+            tab: ((k as 'entities' | 'diagram' | 'providers' | 'rules' | null) || 'entities'),
           })
         }
       >

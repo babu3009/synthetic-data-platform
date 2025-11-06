@@ -41,6 +41,15 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [ ] CI: frontend pipeline
   - Add CI to lint, type-check, build, and run tests for the frontend. Cache node_modules for speed; report coverage.
 
+- [ ] Rules tab persistence
+  - Persist Rules per entity (localStorage + backend endpoints). Prefer backend when available; define typed schema.
+- [ ] Rules & Providers tests
+  - Add unit/integration tests for Providers & PII grid (edits, auto-suggest, save) and Rules editor (YAML/JSON sync, lints, dry-run validate).
+- [ ] Wizard quick-start docs
+  - Add a brief quick-start to the frontend README for the Wizard (Entities, Diagram, Providers & PII, Rules), with screenshots/GIFs.
+- [ ] Fast-refresh cleanup
+  - Extract navbar to `components/navbar.tsx`, reintroduce `app.tsx`, and remove no-op placeholders to clear Vite fast-refresh warning.
+
 ## Backend
 
 - [ ] Persist entities server-side
@@ -53,6 +62,15 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Implement endpoints to export an EntitySchema to JSON and to import canonical JSON into a persisted EntitySchema. Handle validation and deduplication.
 - [ ] Telemetry ingestion and storage
   - Add backend endpoints or logging to accept telemetry events from the frontend and store/aggregate them for UX analysis.
+
+- [ ] Providers save endpoint
+  - Implement/confirm `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` and align with frontend contract.
+- [ ] Validate endpoint
+  - Ensure `/api/v1/validate` exists and returns compact ValidationReport matching frontend contract; add tests.
+- [ ] Lifespan migration
+  - Replace `@app.on_event` startup/shutdown with lifespan context manager and adjust tests/DI accordingly.
+- [ ] Pydantic shadowing fix
+  - Resolve SchemaResponse field shadowing warnings and add a regression test.
 
 ---
 

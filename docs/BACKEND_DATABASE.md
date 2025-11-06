@@ -151,6 +151,40 @@ The database schema consists of 7 core models representing the synthetic data ge
 - **Path Parameters**: `request_id` (UUID), `artifact_id` (UUID)
 - **Response**: `Artifact` object or 404
 
+### Providers & PII
+
+#### POST /api/v1/projects/{project_id}/infer/providers
+- **Purpose**: Infer per-column providers (and PII flags/subtypes) for a submitted entity schema.
+- **Request Body**: Entity schema JSON (see integration notes).
+- **Response**: `{ "suggestions": [{ table, column, provider, providerConfig, pii, piiSubtype }] }`
+
+#### PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers
+- **Purpose**: Persist per-entity provider configuration.
+- **Request Body**: `{ "providers": [{ table, column, provider, providerConfig, pii, piiSubtype }] }`
+- **Response**: Updated summary or `204 No Content`.
+
+### Rules Validation (On-demand)
+
+#### POST /api/v1/validate
+- **Purpose**: Run validation against provided datasets without persisting.
+- **Request Body (abbreviated)**:
+  ```json
+  {
+    "rules": [
+      {"when":"orders.total > 1000","then":["orders.channel in ['WEB','PARTNER']"]},
+      {"uniqueness": ["customers.email"]},
+      {"distribution": {"product.category": {"A":0.5,"B":0.3,"C":0.2}}},
+      {"temporal": "shipment.promised_date <= shipment.order_date + 2d"}
+    ],
+    "data_sample": {"orders": [{"id":1,"total":1500,"channel":"WEB"}]},
+    "data_final": {"orders": [{"id":2,"total":1200,"channel":"STORE"}]},
+    "max_violations": 10
+  }
+  ```
+- **Response**: `{ "rules": [normalized...], "report": { "sample": [...], "final": [...] } }`
+
+See `docs/tasks/2025-11-06-frontend-integration-notes.md` for detailed payloads and TypeScript types.
+
 ### Authentication and API Keys
 
 #### OIDC (scaffold)
