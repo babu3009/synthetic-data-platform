@@ -117,6 +117,8 @@ python -c "import sys; print(sys.executable)"
  - Providers Inference - See README_DATABASE.md (Providers & PII section)
  - LLM Admin & Settings - See README_DATABASE.md (LLM Administration & Project LLM Settings)
  - Frontend LLM Settings UI implemented: project-level toggle, provider/model selection, advanced params (temperature/top_p/max_tokens), guardrails (block PII, allow tool use), and test suggestions panel calling `/api/v1/projects/{projectId}/infer/providers`.
+ - Backend validation: `PUT /api/v1/projects/{projectId}/llm-settings` enforces `model_id` belongs to `provider_id` (422 on mismatch).
+ - Rate limiting: `POST /api/v1/projects/{projectId}/infer/providers` capped at 60/min per project → 429 + audit `llm.infer.rate_limited` when exceeded.
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
@@ -171,6 +173,15 @@ curl -X PUT "http://localhost:8000/api/v1/projects/${PROJECT_ID}/llm-settings" `
 	}'
 ```
 
+Validation errors examples (HTTP 422):
+```json
+{"detail":"model_id requires provider_id"}
+```
+```json
+{"detail":"model_id does not belong to provider_id"}
+```
+```
+
 ### Providers inference (quick)
 
 ```powershell
@@ -184,6 +195,11 @@ curl -X POST "http://localhost:8000/api/v1/projects/${PROJECT_ID}/infer/provider
 		],
 		"llm": {"enabled": false}
 	}'
+```
+
+Rate limit response (HTTP 429):
+```json
+{"detail":"Rate limit exceeded; try again later"}
 ```
 
 Response shape (per column suggestions):

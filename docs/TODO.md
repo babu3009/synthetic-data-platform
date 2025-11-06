@@ -58,6 +58,16 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [ ] Manual smoke test
   - Run frontend locally and verify: settings load/save, role-based disables, provider/model filtering, and Test Suggestion results.
 
+#### Backend Enhancements (recently added)
+- [x] Provider/model ownership validation
+  - Server-side check in PUT `/api/v1/projects/{projectId}/llm-settings` ensures `model_id` belongs to `provider_id`; returns 422 otherwise.
+- [x] Per-project inference rate limit
+  - Added in-memory limiter (60/min) for `POST /api/v1/projects/{projectId}/infer/providers` with 429 and audit `llm.infer.rate_limited`.
+- [ ] Audit probe events
+  - Emit audit event for provider probe (`llm.provider.probe`) to complete coverage.
+- [ ] Assert audit in rate limit tests
+  - Extend test to verify `llm.infer.rate_limited` audit row insertion.
+
 - [ ] Rules tab persistence
   - Persist Rules per entity (localStorage + backend endpoints). Prefer backend when available; define typed schema.
 - [ ] Rules & Providers tests
@@ -122,6 +132,12 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Add periodic task or admin action to re-evaluate `is_default` per provider when context windows or recommended base models change.
 - [ ] Caching layer
   - Cache raw discovery payloads (short TTL) to reduce repeated external calls when multiple admins trigger discovery.
+
+#### Testing Additions
+- [x] Invalid model/provider tests
+  - Added test covering missing `provider_id` and mismatched provider/model (422) and valid pairing (200).
+- [x] Rate limit tests
+  - Added test confirming 60 successful inference calls then 429 on exceed within same minute window.
 - [ ] Docs expansion
   - Extend QUICK_REFERENCE and ENVIRONMENT docs with discovery usage examples (curl), default assignment rules, and troubleshooting (e.g., missing API key).
 

@@ -303,6 +303,26 @@ Example payload:
 }
 ```
 
+Validation rules:
+- `model_id` requires `provider_id` (422 if omitted).
+- `model_id` must belong to `provider_id` (422 if mismatch).
+- 404 if the referenced model does not exist.
+
+Error examples:
+```json
+{"detail":"model_id requires provider_id"}
+```
+```json
+{"detail":"model_id does not belong to provider_id"}
+```
+
+### Inference Rate Limiting
+
+Endpoint `POST /api/v1/projects/{project_id}/infer/providers` is limited to 60 requests per minute per project.
+- On exceed returns HTTP 429 with body: `{ "detail": "Rate limit exceeded; try again later" }`
+- Emits audit event `llm.infer.rate_limited` with payload `{"limit":60}`.
+- Implementation is an in-memory limiter; replace with Redis for multi-process deployments.
+
 ### LLM Client Factory (internal)
 
 Code can resolve a project-scoped LLM client with decrypted credentials via:

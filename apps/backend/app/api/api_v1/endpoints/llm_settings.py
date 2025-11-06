@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import project_llm_setting as crud_setting
 from app.db.session import get_db
-from app.db.models import AuditEvent, ProjectRole
+from app.db.models import AuditEvent, ProjectRole, LLMModel
+from sqlalchemy import select
 from app.schemas.llm import ProjectLLMSettingOut, ProjectLLMSettingUpdate
 from app.security.auth import get_current_principal, require_project_scope
 
@@ -52,6 +53,17 @@ async def put_settings(
 ):
     await require_project_scope(str(project_id), required_roles=[ProjectRole.EDITOR], principal=principal, db=db)
     existing = await crud_setting.get_by_project(db, project_id=project_id)
+
+    # Server-side validation that model_id belongs to provider_id if both set
+    if body.model_id and not body.provider_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="model_id requires provider_id")
+    if body.model_id and body.provider_id:
+        res = await db.execute(select(LLMModel).where(LLMModel.id == body.model_id))
+        model = res.scalar_one_or_none()
+        if not model:
+            raise HTTPException(status_code=404, detail="Model not found")
+        if str(model.provider_id) != str(body.provider_id):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="model_id does not belong to provider_id")
     if existing:
         updated = await crud_setting.update(db, db_obj=existing, obj_in=body)
     else:

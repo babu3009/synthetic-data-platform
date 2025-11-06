@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic import ValidationError
+from pydantic import model_validator
 from pydantic.config import ConfigDict
 
 
@@ -97,6 +99,13 @@ class ProjectLLMSettingBase(BaseModel):
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(default=None, ge=1)
     guardrails_json: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_model_provider_combo(self):
+        # If a model_id is provided, a provider_id must also be provided
+        if getattr(self, "model_id", None) and not getattr(self, "provider_id", None):
+            raise ValueError("model_id requires provider_id to be set")
+        return self
 
 
 class ProjectLLMSettingUpdate(ProjectLLMSettingBase):
