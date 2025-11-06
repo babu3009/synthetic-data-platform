@@ -106,6 +106,7 @@ make seed             # Seed database with sample data
 - React Router
 - React Query (TanStack Query)
 - React Hook Form
+- Zod (runtime schemas and validation)
 - Recharts (charts)
 - ReactFlow (flow diagrams)
 
@@ -115,6 +116,15 @@ make seed             # Seed database with sample data
 - Providers & PII: per-column provider selection (faker, pattern, sequence, categorical, expression, geo, checksum-valid, reference, empirical), JSON config with inline validation, PII toggle with subtype, bulk auto-suggest via backend with confirmation diff, and save
 - Rules: split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal), one-click dry-run validation via POST /api/v1/validate with compact report for sample vs final data
 - Outputs & Run: pick output formats (CSV/XLSX/Parquet/JSONL), destination, optional schedule; compute estimates via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`; create and start requests; navigate to Request Detail with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
+
+### Client types and hooks
+
+- Shared types and Zod schemas live in `apps/frontend/src/types/schema.ts` and cover entities, tables/columns, relationships, providers, distributions, and rule definitions.
+- React Query hooks centralize data access and cache invalidation:
+   - `useEntities(projectId)` for list/create/update/delete with cache keys like `['entities', projectId]`
+   - `useSources(projectId)` for source uploads (DDL/JSON) and schema fetching
+   - `useInferProviders(projectId)` to call backend auto-suggest for provider configs
+   - `useValidate(projectId)` to dry-run validate Rules payloads against the backend
 
 ### Infrastructure
 - PostgreSQL 15

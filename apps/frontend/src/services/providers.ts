@@ -1,5 +1,5 @@
 import api from './api'
-import type { EntitySchema } from '../state/wizard'
+import type { EntitySchema } from '../types/schema'
 
 export type ProviderSuggestion = {
   table: string

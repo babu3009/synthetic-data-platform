@@ -66,6 +66,7 @@ synthetic-data-platform/
 - **Routing**: React Router v6
 - **State Management**: TanStack Query (React Query)
 - **Forms**: React Hook Form
+- **Validation**: Zod runtime schemas for client-side typing and validation
 - **Charts**: Recharts
 - **Flow Diagrams**: ReactFlow
 - **Testing**: Vitest + Testing Library
@@ -243,6 +244,15 @@ Planned next steps:
 - Add end-to-end tests around Providers & PII and Rules tabs
 - Tidy Vite fast-refresh warning (extract navbar, restore App shell)
 - Flesh out docs with curl examples for Providers, Validate, and Requests lifecycle (estimate/start/status/artifacts)
+
+### 🧩 Client-side data layer
+
+- Shared Zod schemas and TypeScript types: `apps/frontend/src/types/schema.ts` (entities, tables/columns, FKs, relationships, providers, distributions, rules)
+- React Query hooks for API access and cache management:
+   - Entities: `useEntities(projectId)` (list/create/update/delete)
+   - Sources: `useSources(projectId)` (upload DDL/JSON and fetch inferred schema)
+   - Providers inference: `useInferProviders(projectId)`
+   - Rules validation: `useValidate(projectId)`
 
 ## 📚 Additional Resources
 
