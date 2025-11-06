@@ -3,7 +3,7 @@ Base SQLAlchemy declarative base and metadata.
 """
 import os
 from sqlalchemy import MetaData
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
 # Define the schema for all tables (configurable via env)

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Button, Table, Alert } from 'react-bootstrap'
 import { useWizard, isEntityNameUnique, EntitySchema } from '../../state/wizard'
-import AddEntityModal from '../../components/entities/AddEntityModal'
+import AddEntityModal from '../../components/entities/add_entity_modal'
 
 export default function EntitiesPage() {
   const { state, dispatch } = useWizard()
@@ -64,7 +64,7 @@ export default function EntitiesPage() {
               </td>
             </tr>
           ) : (
-            entities.map((e) => (
+            entities.map((e: EntitySchema) => (
               <tr key={e.id} role="button" onClick={() => dispatch({ type: 'setSelectedEntity', id: e.id })}>
                 <td>{e.name}</td>
                 <td>{e.tables?.length ?? 0}</td>
@@ -79,7 +79,7 @@ export default function EntitiesPage() {
         show={show}
         onHide={() => setShow(false)}
         projectId={projectId}
-        existingNames={entities.map((e) => e.name)}
+        existingNames={entities.map((e: EntitySchema) => e.name)}
         onCreated={onCreated}
       />
     </div>

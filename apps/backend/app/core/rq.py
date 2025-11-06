@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Dict
 
+import os
 from app.core.config import settings
 
 _redis: Any = None
@@ -31,7 +32,22 @@ def get_queue(name: str = "default") -> Any:
     """
     global _queues
     if name not in _queues:
-        from rq import Queue  # type: ignore
-
-        _queues[name] = Queue(name, connection=get_redis_connection())
+        # Under pytest, avoid connecting to a real Redis by returning a lightweight fake queue.
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            class _FakeJob:
+                def __init__(self) -> None:
+                    self._id = "test-job-id"
+                def get_id(self) -> str:
+                    return self._id
+            class _FakeQueue:
+                def __init__(self, qname: str) -> None:
+                    self.name = qname
+                    self.last_enqueued = None
+                def enqueue(self, func, *args, **kwargs):
+                    self.last_enqueued = {"func": func, "args": args, "kwargs": kwargs}
+                    return _FakeJob()
+            _queues[name] = _FakeQueue(name)
+        else:
+            from rq import Queue  # type: ignore
+            _queues[name] = Queue(name, connection=get_redis_connection())
     return _queues[name]

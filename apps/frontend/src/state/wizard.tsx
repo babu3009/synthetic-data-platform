@@ -4,6 +4,9 @@ export type Column = {
   name: string
   dtype: string
   nullable: boolean
+  regex?: string
+  distribution?: string
+  pii?: boolean
 }
 
 export type Table = {
@@ -11,6 +14,9 @@ export type Table = {
   columns: Column[]
   pk?: string[]
   uniques?: string[][]
+  rowTarget?:
+    | { type: 'absolute'; value: number }
+    | { type: 'ratioTo'; table: string; ratio: number }
 }
 
 export type EntitySchema = {
@@ -18,6 +24,17 @@ export type EntitySchema = {
   name: string
   tables: Table[]
   updatedAt: string // ISO string
+  relationships?: Relationship[]
+  layout?: Record<string, { x: number; y: number }>
+}
+
+export type Relationship = {
+  id: string
+  sourceTable: string
+  sourceColumn: string
+  targetTable: string
+  targetColumn: string
+  cardinality: 'ONE_TO_ONE' | 'ONE_TO_MANY' | 'MANY_TO_MANY'
 }
 
 export type WizardState = {
@@ -32,6 +49,12 @@ type Action =
   | { type: 'addEntity'; entity: Omit<EntitySchema, 'id' | 'updatedAt'> & Partial<Pick<EntitySchema, 'id' | 'updatedAt'>> }
   | { type: 'setSelectedEntity'; id?: string }
   | { type: 'setActiveTab'; tab: WizardState['activeTab'] }
+  | { type: 'updateEntity'; id: string; patch: Partial<EntitySchema> }
+  | { type: 'updateTable'; entityId: string; tableName: string; patch: Partial<Table> }
+  | { type: 'togglePk'; entityId: string; tableName: string; columnName: string }
+  | { type: 'upsertRelationship'; entityId: string; rel: Relationship }
+  | { type: 'deleteRelationship'; entityId: string; relId: string }
+  | { type: 'saveLayout'; entityId: string; layout: Record<string, { x: number; y: number }> }
 
 function reducer(state: WizardState, action: Action): WizardState {
   switch (action.type) {
@@ -51,6 +74,55 @@ function reducer(state: WizardState, action: Action): WizardState {
       return { ...state, selectedEntityId: action.id }
     case 'setActiveTab':
       return { ...state, activeTab: action.tab }
+    case 'updateEntity': {
+      const entities = state.entities.map((e) => (e.id === action.id ? { ...e, ...action.patch, updatedAt: new Date().toISOString() } : e))
+      return { ...state, entities }
+    }
+    case 'updateTable': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const tables = e.tables.map((t) => (t.name === action.tableName ? { ...t, ...action.patch } : t))
+        return { ...e, tables, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
+    case 'togglePk': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const tables = e.tables.map((t) => {
+          if (t.name !== action.tableName) return t
+          const set = new Set(t.pk || [])
+          if (set.has(action.columnName)) set.delete(action.columnName)
+          else set.add(action.columnName)
+          return { ...t, pk: Array.from(set) }
+        })
+        return { ...e, tables, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
+    case 'upsertRelationship': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const rels = [...(e.relationships || [])]
+        const idx = rels.findIndex((r) => r.id === action.rel.id)
+        if (idx >= 0) rels[idx] = action.rel
+        else rels.unshift(action.rel)
+        return { ...e, relationships: rels, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
+    case 'deleteRelationship': {
+      const entities = state.entities.map((e) => {
+        if (e.id !== action.entityId) return e
+        const rels = (e.relationships || []).filter((r) => r.id !== action.relId)
+        return { ...e, relationships: rels, updatedAt: new Date().toISOString() }
+      })
+      return { ...state, entities }
+    }
+    case 'saveLayout': {
+      const entities = state.entities.map((e) => (e.id === action.entityId ? { ...e, layout: action.layout, updatedAt: new Date().toISOString() } : e))
+      return { ...state, entities }
+    }
     default:
       return state
   }

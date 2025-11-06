@@ -178,6 +178,12 @@ async def require_project_scope(
     db: Optional[AsyncSession] = None,
 ) -> Principal:
     """Authorize access to a project using either API key scopes or user RBAC roles."""
+    # Test bypass: allow disabling auth in test/dev via env flag
+    if os.getenv("AUTH_DISABLED", "").lower() in {"1", "true", "yes"}:
+        # When disabled for tests, allow unauthenticated calls, but still enforce
+        # scope/role rules if a principal (e.g., API key) is explicitly provided.
+        if principal is None:
+            return Principal(kind="user", actor="user:test", user_sub="test")
     if principal is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 

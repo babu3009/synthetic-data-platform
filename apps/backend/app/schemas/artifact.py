@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 from app.db.models import ArtifactFormat
 
@@ -23,8 +24,8 @@ class ArtifactCreate(ArtifactBase):
 
 class ArtifactUpdate(BaseModel):
     """Schema for updating an artifact."""
-    storage_uri: str = Field(None, min_length=1, max_length=2048)
-    size_bytes: int = Field(None, ge=0)
+    storage_uri: str | None = Field(None, min_length=1, max_length=2048)
+    size_bytes: int | None = Field(None, ge=0)
 
 
 class ArtifactInDBBase(ArtifactBase):
@@ -33,8 +34,7 @@ class ArtifactInDBBase(ArtifactBase):
     request_id: UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Artifact(ArtifactInDBBase):

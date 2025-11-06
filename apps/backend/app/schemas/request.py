@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 from app.db.models import RequestType, RequestStatus
 
@@ -39,9 +40,8 @@ class RequestInDBBase(RequestBase):
     created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Request(RequestInDBBase):

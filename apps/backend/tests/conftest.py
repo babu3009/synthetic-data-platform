@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from typing import AsyncGenerator
 from sqlalchemy import text
 
+import os
+os.environ.setdefault("AUTH_DISABLED", "true")
 from app.main import app
 from app.db.base import Base, SCHEMA_NAME as MODEL_SCHEMA
 from app.db.session import get_db

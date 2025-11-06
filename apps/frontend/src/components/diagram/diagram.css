@@ -1,0 +1,21 @@
+.diagram-container {
+  height: 80vh;
+}
+
+.diagram-flow {
+  height: calc(80vh - 48px);
+}
+
+.table-card {
+  min-width: 260px;
+}
+
+.handle-in {
+  position: relative;
+  left: -8px;
+}
+
+.handle-out {
+  position: relative;
+  right: -8px;
+}

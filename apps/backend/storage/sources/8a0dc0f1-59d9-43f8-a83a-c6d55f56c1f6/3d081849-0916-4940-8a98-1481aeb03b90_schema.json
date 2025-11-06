@@ -1,0 +1,1 @@
+{"tables": [{"name": "users", "columns": [{"name": "id", "dtype": "INTEGER", "nullable": false}, {"name": "name", "dtype": "VARCHAR(100)", "nullable": true}], "pk": ["id"], "uniques": [], "checks": [], "fks": []}], "dag": {"nodes": ["users"], "edges": []}, "warnings": []}

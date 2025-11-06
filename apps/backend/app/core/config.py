@@ -2,7 +2,7 @@ import secrets
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -38,7 +38,6 @@ class Settings(BaseSettings):
     # Database schema (and optional testing schema)
     DB_SCHEMA: str = "synthetic_data"
     TESTING_DB_SCHEMA: Optional[str] = None
-    DB_SCHEMA: str = "synthetic_data"
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:
@@ -71,9 +70,12 @@ class Settings(BaseSettings):
     MAX_ROWS_PER_GENERATION: int = 1_000_000
     DEFAULT_ROWS_PER_GENERATION: int = 1000
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # Pydantic v2 settings configuration
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",  # Allow extra env vars like OIDC_* without raising
+    )
 
 
 settings = Settings()

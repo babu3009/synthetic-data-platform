@@ -57,28 +57,24 @@ async def start_request(
 
     # Enqueue background job with RQ and metadata
     job_id = ""
-    if os.getenv("PYTEST_CURRENT_TEST"):
-        # Skip queueing under tests; simulate a job id
-        job_id = "test-job-id"
+    q = cast(Any, get_queue(priority))
+    if rtype == RequestType.FLAT:
+        job = q.enqueue(
+            run_flat_job,
+            str(request_id),
+            meta={"request_id": str(request_id)},
+            retry=Retry(max=3),
+        )
+    elif rtype == RequestType.RELATIONAL:
+        job = q.enqueue(
+            run_relational_job,
+            str(request_id),
+            meta={"request_id": str(request_id)},
+            retry=Retry(max=3),
+        )
     else:
-        q = cast(Any, get_queue(priority))
-        if rtype == RequestType.FLAT:
-            job = q.enqueue(
-                run_flat_job,
-                str(request_id),
-                meta={"request_id": str(request_id)},
-                retry=Retry(max=3),
-            )
-        elif rtype == RequestType.RELATIONAL:
-            job = q.enqueue(
-                run_relational_job,
-                str(request_id),
-                meta={"request_id": str(request_id)},
-                retry=Retry(max=3),
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported request type for start")
-        job_id = job.get_id()
+        raise HTTPException(status_code=400, detail="Unsupported request type for start")
+    job_id = job.get_id()
 
     # Stash job id in params and keep status as PENDING (worker will set RUNNING)
     updated_params: Dict[str, Any] = {}

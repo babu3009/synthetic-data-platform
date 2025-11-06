@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import { Tabs, Tab, Container } from 'react-bootstrap'
 import { useSearchParams } from 'react-router-dom'
 import { WizardProvider, useWizard } from '../state/wizard'
-import EntitiesPage from './wizard/EntitiesPage'
-import DiagramPage from './wizard/DiagramPage'
+import EntitiesPage from './wizard/entities_page'
+import DiagramPage from './wizard/diagram_page'
 
 function WizardInner() {
   const { state, dispatch } = useWizard()

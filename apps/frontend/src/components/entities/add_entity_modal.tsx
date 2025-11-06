@@ -208,7 +208,11 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
                 <Col md={6}>
                   <Form.Group controlId="ddlFile" className="mb-2">
                     <Form.Label>Upload DDL file</Form.Label>
-                    <Form.Control type="file" accept=".sql,.txt" onChange={(e) => setDdlFile(e.target.files?.[0] || null)} />
+                    <Form.Control
+                      type="file"
+                      accept=".sql,.txt"
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDdlFile(e.target.files?.[0] || null)}
+                    />
                   </Form.Group>
                 </Col>
                 <Col md={6}>

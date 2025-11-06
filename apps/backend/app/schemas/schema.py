@@ -6,6 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 
 class ColumnSchema(BaseModel):
@@ -61,8 +62,7 @@ class SchemaResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list, description="Parsing warnings")
     created_at: datetime = Field(..., description="Schema creation timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SourceUploadResponse(BaseModel):
