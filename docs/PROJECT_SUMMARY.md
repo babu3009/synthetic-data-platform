@@ -237,6 +237,11 @@ Current features:
 4. **Rules** – Split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal) and dry-run validation via `POST /api/v1/validate` returning a compact report for sample vs final datasets.
 5. **Outputs & Run** – Choose output formats and destination, optionally set a schedule, estimate request size/time via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`, create and start requests, then view a dedicated Request Detail page with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
+Additional UX and performance improvements:
+- Keyboard navigation for diagram node lists and Providers grid; visible focus outlines and ARIA labels.
+- Contextual tooltips for PK/FK, row target modes, Provider/Config/PII headers, and Rules distribution.
+- Performance tuning: paged (windowed) column lists in diagram nodes; lazy-loaded Column Editor modal.
+
 Planned next steps:
 
 - Persist rules per entity (backend + localStorage fallback)

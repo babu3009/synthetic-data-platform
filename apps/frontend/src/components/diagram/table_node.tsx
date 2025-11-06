@@ -1,6 +1,6 @@
-import { memo, type ChangeEvent } from 'react'
+import { memo, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { Badge, Button, ButtonGroup, Dropdown, Form, InputGroup } from 'react-bootstrap'
+import { Badge, Button, ButtonGroup, Dropdown, Form, InputGroup, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { Column, Table } from '../../state/wizard'
 
 type Data = {
@@ -19,6 +19,37 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
   const t = data.table
   const pk = new Set(t.pk || [])
   const rowTarget = t.rowTarget
+  const pageSize = 50
+  const [page, setPage] = useState(0)
+  const total = t.columns.length
+  const start = page * pageSize
+  const end = Math.min(total, start + pageSize)
+  const visible = useMemo(() => t.columns.slice(start, end), [t.columns, start, end])
+
+  function onItemKeyDown(e: KeyboardEvent<HTMLLIElement>, colName: string) {
+    // space/enter toggles PK; e opens editor
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      data.onTogglePk(colName)
+      return
+    }
+    if (e.key.toLowerCase() === 'e') {
+      const c = t.columns.find((c) => c.name === colName)
+      if (c) data.onOpenColumn(c)
+      return
+    }
+    // Arrow navigation between items
+    const current = e.currentTarget
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = current.nextElementSibling as HTMLLIElement | null
+      next?.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prev = current.previousElementSibling as HTMLLIElement | null
+      prev?.focus()
+    }
+  }
 
   return (
     <div className="card table-card">
@@ -28,12 +59,17 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
       <div className="card-body py-2">
         <div className="mb-2">
           <InputGroup size="sm">
-            <InputGroup.Text>Rows</InputGroup.Text>
+            <InputGroup.Text aria-label="Row target type">
+              Rows
+              <OverlayTrigger placement="top" overlay={<Tooltip>absolute: fixed rows; ratioTo: proportion of another table</Tooltip>}>
+                <span className="ms-1" aria-label="Row target help" role="img">❔</span>
+              </OverlayTrigger>
+            </InputGroup.Text>
             <Dropdown as={ButtonGroup}>
-              <Button size="sm" variant="outline-secondary" disabled>
+              <Button size="sm" variant="outline-secondary" disabled aria-label="Current row target mode">
                 {rowTarget?.type === 'ratioTo' ? 'ratioTo' : 'absolute'}
               </Button>
-              <Dropdown.Toggle split size="sm" variant="outline-secondary" id="rt-toggle" />
+              <Dropdown.Toggle split size="sm" variant="outline-secondary" id="rt-toggle" aria-label="Change row target mode" />
               <Dropdown.Menu>
                 <Dropdown.Item onClick={() => data.onRowTargetChange({ type: 'absolute', value: 1000 })}>absolute</Dropdown.Item>
                 <Dropdown.Item onClick={() => data.onRowTargetChange({ type: 'ratioTo', table: data.allTables[0] || t.name, ratio: 0.5 })}>ratioTo</Dropdown.Item>
@@ -49,6 +85,7 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
                   ))}
                 </Form.Select>
                 <Form.Control
+                  aria-label="Row ratio"
                   size="sm"
                   type="number"
                   step="0.01"
@@ -58,6 +95,7 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
               </>
             ) : (
               <Form.Control
+                aria-label="Absolute row count"
                 size="sm"
                 type="number"
                 value={rowTarget && rowTarget.type === 'absolute' ? rowTarget.value : 1000}
@@ -66,21 +104,38 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
             )}
           </InputGroup>
         </div>
-        <ul className="list-unstyled mb-0">
-          {t.columns.map((c: Column) => (
-            <li key={c.name} className="d-flex align-items-center justify-content-between gap-2 py-1">
-              <div className="d-flex align-items-center gap-2" role="button" onClick={() => data.onTogglePk(c.name)}>
+        <ul
+          className="list-unstyled mb-0"
+          role="listbox"
+          aria-label={`Columns of table ${t.name}`}
+        >
+          {visible.map((c: Column) => (
+            <li
+              key={c.name}
+              className="d-flex align-items-center justify-content-between gap-2 py-1"
+              tabIndex={0}
+              role="option"
+              onKeyDown={(e) => onItemKeyDown(e, c.name)}
+            >
+              <div
+                className="d-flex align-items-center gap-2"
+                role="button"
+                aria-label={`Toggle primary key for ${c.name}`}
+                onClick={() => data.onTogglePk(c.name)}
+              >
                 <Handle id={`in-${t.name}-${c.name}`} type="target" position={Position.Left} className="handle-in" />
                 <span>{c.name}</span>
                 {pk.has(c.name) && (
-                  <Badge bg="warning" text="dark">
-                    <KeyIcon />
-                  </Badge>
+                  <OverlayTrigger placement="top" overlay={<Tooltip>Primary key</Tooltip>}>
+                    <Badge bg="warning" text="dark" aria-label="Primary key">
+                      <KeyIcon />
+                    </Badge>
+                  </OverlayTrigger>
                 )}
                 <small className="text-muted">({c.dtype}{c.nullable ? ', null' : ''})</small>
               </div>
               <div>
-                <Button size="sm" variant="outline-secondary" onClick={() => data.onOpenColumn(c)}>
+                <Button size="sm" variant="outline-secondary" onClick={() => data.onOpenColumn(c)} aria-label={`Edit column ${c.name}`}>
                   Edit
                 </Button>
                 <Handle id={`out-${t.name}-${c.name}`} type="source" position={Position.Right} className="handle-out" />
@@ -88,6 +143,20 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
             </li>
           ))}
         </ul>
+        {total > end && (
+          <div className="d-flex justify-content-center mt-2">
+            <Button size="sm" variant="outline-secondary" onClick={() => setPage((p) => p + 1)} aria-label="Load more columns">
+              Load more…
+            </Button>
+          </div>
+        )}
+        {start > 0 && (
+          <div className="d-flex justify-content-center mt-2">
+            <Button size="sm" variant="outline-secondary" onClick={() => setPage((p) => Math.max(0, p - 1))} aria-label="Show previous columns">
+              Show previous…
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

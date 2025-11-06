@@ -117,6 +117,14 @@ make seed             # Seed database with sample data
 - Rules: split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal), one-click dry-run validation via POST /api/v1/validate with compact report for sample vs final data
 - Outputs & Run: pick output formats (CSV/XLSX/Parquet/JSONL), destination, optional schedule; compute estimates via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`; create and start requests; navigate to Request Detail with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
+#### Accessibility and performance
+- Keyboard navigation:
+   - Diagram: Tab to focus columns, Space/Enter toggles PK, E opens editor, Arrow keys move between rows.
+   - Providers grid: Alt+ArrowUp/Alt+ArrowDown moves focus to the same control in the previous/next row.
+- Visible focus outlines: Bootstrap-compatible :focus-visible and focus ring styles improve discoverability for keyboard users.
+- Tooltips: Contextual help for PK/FK, row targets (absolute/ratioTo), Providers (Provider/Config/PII), and Distribution fields.
+- Performance: Diagram table node column lists are windowed (paged) for large schemas; Column Editor modal is lazy-loaded to reduce initial bundle size.
+
 #### Saving and drafts
 - Autosave: Diagram and Providers tabs autosave after ~800ms of inactivity (best-effort, localStorage fallback).
 - Dirty guard: the wizard warns when navigating away with unsaved changes; tab switches prompt for confirmation.

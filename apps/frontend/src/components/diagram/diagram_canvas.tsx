@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type ChangeEvent, lazy, Suspense } from 'react'
 import ReactFlow, {
   addEdge,
   Background,
@@ -17,7 +17,7 @@ import { Button, Col, Form, Row } from 'react-bootstrap'
 import TableNode from './table_node'
 import { Relationship, useWizard, Column, Table, EntitySchema } from '../../state/wizard'
 import EdgePanel from './edge_panel'
-import ColumnEditorModal from './column_editor_modal'
+const ColumnEditorModal = lazy(() => import('./column_editor_modal'))
 import { autoLayout } from '../../utils/layout'
 import { autosaveEntity } from '../../services/entities'
 import { useAutosave } from '../../hooks/use_autosave'
@@ -60,7 +60,7 @@ export default function DiagramCanvas(_: DiagramProps) {
         table: t,
         allTables: entity.tables.map((x: Table) => x.name),
         onTogglePk: (col: string) => dispatch({ type: 'togglePk', entityId: entity.id, tableName: t.name, columnName: col }),
-        onRowTargetChange: (patch: any) => dispatch({ type: 'updateTable', entityId: entity.id, tableName: t.name, patch: { rowTarget: patch } }),
+  onRowTargetChange: (patch: Table['rowTarget']) => dispatch({ type: 'updateTable', entityId: entity.id, tableName: t.name, patch: { rowTarget: patch } }),
         onOpenColumn: (col: Column) => setEditingColumn({ table: t.name, column: col }),
       },
       position: entity.layout?.[t.name] ?? { x: 0, y: 0 },
@@ -121,7 +121,7 @@ export default function DiagramCanvas(_: DiagramProps) {
     [entity, dispatch, setEdges]
   )
 
-  const onEdgeClick = useCallback((_: any, edge: Edge) => setSelectedRelId(edge.id), [])
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => setSelectedRelId(edge.id), [])
 
   const selectedRel = useMemo(() => (entity?.relationships || []).find((r: Relationship) => r.id === selectedRelId), [entity, selectedRelId])
 
@@ -136,10 +136,10 @@ export default function DiagramCanvas(_: DiagramProps) {
   )
 
   const onNodesChangeWithSave = useCallback(
-    (changes: any) => {
+    (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes)
       // Defer save a bit
-      setTimeout(() => savePositions((nodes as any) as Node[]), 50)
+      setTimeout(() => savePositions(nodes as Node[]), 50)
     },
     [onNodesChange, savePositions, nodes]
   )
@@ -192,7 +192,7 @@ export default function DiagramCanvas(_: DiagramProps) {
     <div className="position-relative diagram-container">
       <Row className="g-2 mb-2">
         <Col md="auto">
-          <Form.Select aria-label="Select entity" value={selectedId} onChange={(e: ChangeEvent<HTMLSelectElement>) => onEntitySelect(e.target.value)}>
+          <Form.Select aria-label="Select entity" value={selectedId} onChange={(e: ChangeEvent<HTMLSelectElement>) => onEntitySelect(e.target.value)} className="focus-ring">
             {state.entities.map((e: EntitySchema) => (
               <option key={e.id} value={e.id}>
                 {e.name}
@@ -201,7 +201,7 @@ export default function DiagramCanvas(_: DiagramProps) {
           </Form.Select>
         </Col>
         <Col md="auto">
-          <Button variant="outline-secondary" onClick={onAutoLayout}>
+          <Button variant="outline-secondary" onClick={onAutoLayout} aria-label="Auto layout tables" className="focus-ring">
             Auto Layout
           </Button>
         </Col>
@@ -231,12 +231,14 @@ export default function DiagramCanvas(_: DiagramProps) {
         onChange={onEdgeChange}
         onDelete={onEdgeDelete}
       />
-      <ColumnEditorModal
-        show={!!editingColumn}
-        column={editingColumn?.column}
-        onSave={onColumnSave}
-        onHide={() => setEditingColumn(null)}
-      />
+      <Suspense fallback={null}>
+        <ColumnEditorModal
+          show={!!editingColumn}
+          column={editingColumn?.column}
+          onSave={onColumnSave}
+          onHide={() => setEditingColumn(null)}
+        />
+      </Suspense>
     </div>
   )
 }

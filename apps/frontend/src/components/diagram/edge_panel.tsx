@@ -1,4 +1,4 @@
-import { Button, Form, Offcanvas } from 'react-bootstrap'
+import { Button, Form, Offcanvas, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { Relationship } from '../../state/wizard'
 
 type Props = {
@@ -30,10 +30,16 @@ export default function EdgePanel({ show, onHide, relationship, onChange, onDele
           </div>
         </div>
         <Form.Group controlId="cardinality" className="mb-3">
-          <Form.Label>Cardinality</Form.Label>
+          <Form.Label>
+            <span className="me-1">Cardinality</span>
+            <OverlayTrigger placement="top" overlay={<Tooltip>ONE_TO_ONE, ONE_TO_MANY, or MANY_TO_MANY</Tooltip>}>
+              <span role="img" aria-label="Cardinality help">❔</span>
+            </OverlayTrigger>
+          </Form.Label>
           <Form.Select
             value={relationship.cardinality}
             onChange={(e) => onChange({ ...relationship, cardinality: e.target.value as Relationship['cardinality'] })}
+            aria-label="Relationship cardinality"
           >
             <option value="ONE_TO_ONE">ONE_TO_ONE</option>
             <option value="ONE_TO_MANY">ONE_TO_MANY</option>

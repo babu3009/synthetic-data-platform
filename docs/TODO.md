@@ -101,3 +101,11 @@ This list mirrors the in-editor task tracker and can be maintained alongside cod
   - Added 800ms autosave for Diagram and Providers tabs, tracked dirty flag, and warned on navigating away with unsaved changes.
 - [x] Draft mode for entities
   - Autosaved partial entities per project and rehydrated them on load so users can leave and return later.
+ - [x] Accessibility (A11y) improvements
+   - Added keyboard navigation for diagram node lists (Space/Enter toggles PK, E opens editor, Arrow keys navigate) and Providers grid (Alt+ArrowUp/Down to move vertically). Added aria-labels and visible focus outlines aligned with Bootstrap.
+ - [x] Tooltips and inline help
+   - Added contextual tooltips for PK/FK indicators, row targets (absolute/ratioTo), distribution field help, and Providers grid headers (Provider, Config, PII).
+ - [x] Dark mode compatibility
+   - Implemented prefers-color-scheme dark styles and Bootstrap-friendly focus rings without introducing a new CSS framework.
+ - [x] Performance optimizations
+   - Windowed long column lists in diagram table nodes (paged view) and lazy-loaded the Column Editor modal to reduce initial bundle size.

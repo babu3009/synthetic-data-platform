@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Modal, Button, Form } from 'react-bootstrap'
+import { Modal, Button, Form, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { Column } from '../../state/wizard'
 
 type Props = {
@@ -52,8 +52,13 @@ export default function ColumnEditorModal({ show, column, onSave, onHide }: Prop
           <Form.Control value={state.regex || ''} onChange={(e) => setState({ ...state, regex: e.target.value })} />
         </Form.Group>
         <Form.Group className="mb-2">
-          <Form.Label>Distribution</Form.Label>
-          <Form.Control placeholder="e.g., normal(mu=0,sigma=1) or categorical(a:0.7,b:0.3)" value={state.distribution || ''} onChange={(e) => setState({ ...state, distribution: e.target.value })} />
+          <Form.Label>
+            <span className="me-1">Distribution</span>
+            <OverlayTrigger placement="top" overlay={<Tooltip>Specify statistical distribution or categorical weights</Tooltip>}>
+              <span role="img" aria-label="Distribution help">❔</span>
+            </OverlayTrigger>
+          </Form.Label>
+          <Form.Control placeholder="e.g., normal(mu=0,sigma=1) or categorical(a:0.7,b:0.3)" value={state.distribution || ''} onChange={(e) => setState({ ...state, distribution: e.target.value })} aria-label="Distribution expression" />
         </Form.Group>
       </Modal.Body>
       <Modal.Footer>

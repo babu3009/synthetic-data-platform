@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Col, Form, Row, Table, ToggleButton, ToggleButtonGroup } from 'react-bootstrap'
+import { Alert, Button, Col, Form, Row, Table, ToggleButton, ToggleButtonGroup, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import YAML from 'js-yaml'
 import { useWizard } from '../../state/wizard'
 import type { Rule, ValidationReport } from '../../services/validation'
@@ -162,13 +162,15 @@ export default function RulesPage() {
       <div className="d-flex justify-content-between align-items-center mb-2">
         <div className="d-flex align-items-center gap-2">
           <strong>Edit source:</strong>
-          <ToggleButtonGroup type="radio" name="source" value={source} onChange={(val: 'yaml'|'json') => setSource(val)}>
-            <ToggleButton id="src-yaml" value={'yaml'} size="sm" variant={source==='yaml'?'primary':'outline-primary'}>YAML</ToggleButton>
-            <ToggleButton id="src-json" value={'json'} size="sm" variant={source==='json'?'primary':'outline-primary'}>JSON</ToggleButton>
+          <ToggleButtonGroup type="radio" name="source" value={source} onChange={(val: 'yaml'|'json') => setSource(val)} aria-label="Select rules edit source">
+            <ToggleButton id="src-yaml" value={'yaml'} size="sm" variant={source==='yaml'?'primary':'outline-primary'} aria-label="Edit YAML">YAML</ToggleButton>
+            <ToggleButton id="src-json" value={'json'} size="sm" variant={source==='json'?'primary':'outline-primary'} aria-label="Edit JSON">JSON</ToggleButton>
           </ToggleButtonGroup>
         </div>
         <div className="d-flex align-items-center gap-2">
-          <Button onClick={onDryRunValidate} disabled={sending || !rules || parseError!==null}> {sending ? 'Validating…' : 'Dry-run validate'} </Button>
+          <OverlayTrigger placement="left" overlay={<Tooltip>Run a server-side check without saving rules</Tooltip>}>
+            <Button onClick={onDryRunValidate} disabled={sending || !rules || parseError!==null} aria-label="Dry-run validate rules"> {sending ? 'Validating…' : 'Dry-run validate'} </Button>
+          </OverlayTrigger>
         </div>
       </div>
 
@@ -187,13 +189,13 @@ export default function RulesPage() {
         <Col md={6}>
           <Form.Group controlId="rulesYaml">
             <Form.Label>YAML</Form.Label>
-            <Form.Control as="textarea" rows={18} value={yamlText} onChange={(e) => setYamlText(e.target.value)} disabled={source!=='yaml'} />
+            <Form.Control as="textarea" rows={18} value={yamlText} onChange={(e) => setYamlText(e.target.value)} disabled={source!=='yaml'} aria-label="Rules YAML editor" />
           </Form.Group>
         </Col>
         <Col md={6}>
           <Form.Group controlId="rulesJson">
             <Form.Label>JSON</Form.Label>
-            <Form.Control as="textarea" rows={18} value={jsonText} onChange={(e) => setJsonText(e.target.value)} disabled={source!=='json'} />
+            <Form.Control as="textarea" rows={18} value={jsonText} onChange={(e) => setJsonText(e.target.value)} disabled={source!=='json'} aria-label="Rules JSON editor" />
             <Form.Text muted>Switch edit source to modify this pane.</Form.Text>
           </Form.Group>
         </Col>
@@ -220,7 +222,8 @@ export default function RulesPage() {
 
 function ReportTable({ results }: { results: NonNullable<ValidationReport['sample']> }) {
   const rows = results || []
-  const passCount = rows.filter((r) => (r as any).stat ? (r as any).stat.pass : (r.violations ?? 0) === 0).length
+  type BaseRow = { type?: string; table?: string; checked?: number; violations?: number; violation_rate?: number; stat?: { pass?: boolean } }
+  const passCount = rows.filter((r) => (r as BaseRow).stat ? Boolean((r as BaseRow).stat?.pass) : (((r as BaseRow).violations ?? 0) === 0)).length
   const failCount = rows.length - passCount
   return (
     <div>

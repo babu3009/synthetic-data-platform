@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Button, Col, Form, Modal, Row, Table } from 'react-bootstrap'
+import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
 import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
 import { autosaveEntity } from '../../services/entities'
@@ -282,7 +282,7 @@ export default function ProvidersPiiPage() {
           <span>{entity.name}</span>
         </div>
         <div className="d-flex align-items-center gap-2">
-          <Form.Select size="sm" value={tableFilter} onChange={(e) => setTableFilter(e.target.value)}>
+          <Form.Select size="sm" value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} aria-label="Filter by table">
             <option value="__all__">All tables</option>
             {tables.map((t) => (
               <option key={t.name} value={t.name}>
@@ -290,10 +290,10 @@ export default function ProvidersPiiPage() {
               </option>
             ))}
           </Form.Select>
-          <Button variant="secondary" size="sm" onClick={handleSuggest} disabled={loadingSuggest}>
+          <Button variant="secondary" size="sm" onClick={handleSuggest} disabled={loadingSuggest} aria-label="Auto-suggest providers from column metadata">
             {loadingSuggest ? 'Suggesting…' : 'Auto-suggest providers'}
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
+          <Button size="sm" onClick={handleSave} disabled={saving} aria-label="Save provider and PII settings">
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
@@ -305,9 +305,30 @@ export default function ProvidersPiiPage() {
             <th>Table</th>
             <th>Column</th>
             <th>Type</th>
-            <th>Provider</th>
-            <th>Config (JSON)</th>
-            <th>PII</th>
+            <th>
+              <div className="d-flex align-items-center gap-1">
+                <span>Provider</span>
+                <OverlayTrigger placement="top" overlay={<Tooltip>Select a generator for this column</Tooltip>}>
+                  <span role="img" aria-label="Provider help">❔</span>
+                </OverlayTrigger>
+              </div>
+            </th>
+            <th>
+              <div className="d-flex align-items-center gap-1">
+                <span>Config (JSON)</span>
+                <OverlayTrigger placement="top" overlay={<Tooltip>Provider-specific configuration</Tooltip>}>
+                  <span role="img" aria-label="Config help">❔</span>
+                </OverlayTrigger>
+              </div>
+            </th>
+            <th>
+              <div className="d-flex align-items-center gap-1">
+                <span>PII</span>
+                <OverlayTrigger placement="top" overlay={<Tooltip>Mark and subtype personally identifiable info</Tooltip>}>
+                  <span role="img" aria-label="PII help">❔</span>
+                </OverlayTrigger>
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -328,8 +349,21 @@ export default function ProvidersPiiPage() {
                   <td>{column.dtype}</td>
                   <td>
                     <Form.Select
+                      aria-label={`Provider for ${table}.${column.name}`}
                       value={column.provider || ''}
                       onChange={(e) => handleProviderChange(table, column, (e.target.value || undefined) as Column['provider'])}
+                      onKeyDown={(e) => {
+                        if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                          e.preventDefault()
+                          const dir = e.key === 'ArrowDown' ? 1 : -1
+                          const nextIndex = idx + dir
+                          const selector = `[data-row-index="${nextIndex}"][data-col-role="provider"]`
+                          const el = document.querySelector<HTMLSelectElement>(selector)
+                          el?.focus()
+                        }
+                      }}
+                      data-row-index={idx}
+                      data-col-role="provider"
                     >
                       <option value="">(none)</option>
                       {providerOptions.map((p) => (
@@ -343,10 +377,23 @@ export default function ProvidersPiiPage() {
                     <Form.Control
                       as="textarea"
                       rows={1}
+                      aria-label={`Provider config for ${table}.${column.name}`}
                       value={cfgText}
                       onChange={(e) => handleConfigChange(table, column, e.target.value)}
                       placeholder={column.provider === 'pattern' ? '{"mask":"AA-9999"}' : column.provider === 'categorical' ? '{"categories":[{"value":"A","weight":0.5}]}' : '{}'}
                       isInvalid={!!validation}
+                      onKeyDown={(e) => {
+                        if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                          e.preventDefault()
+                          const dir = e.key === 'ArrowDown' ? 1 : -1
+                          const nextIndex = idx + dir
+                          const selector = `[data-row-index="${nextIndex}"][data-col-role="config"]`
+                          const el = document.querySelector<HTMLTextAreaElement>(selector)
+                          el?.focus()
+                        }
+                      }}
+                      data-row-index={idx}
+                      data-col-role="config"
                     />
                     {validation && <Form.Control.Feedback type="invalid">{validation}</Form.Control.Feedback>}
                   </td>
@@ -355,6 +402,7 @@ export default function ProvidersPiiPage() {
                       <Col xs="auto" className="d-flex align-items-center">
                         <Form.Check
                           type="switch"
+                          aria-label={`PII switch for ${table}.${column.name}`}
                           checked={!!column.pii}
                           onChange={(e) => handlePiiToggle(table, column, e.target.checked)}
                           label="PII"
@@ -363,6 +411,7 @@ export default function ProvidersPiiPage() {
                       <Col>
                         <Form.Select
                           disabled={!column.pii}
+                          aria-label={`PII subtype for ${table}.${column.name}`}
                           value={column.piiSubtype || ''}
                           onChange={(e) =>
                             handlePiiSubtype(
