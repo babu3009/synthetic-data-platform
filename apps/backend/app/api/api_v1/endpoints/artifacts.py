@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, schemas
 from app.db.session import get_db
 from app.services.storage import get_storage
+from app.security.auth import require_project_scope, get_current_principal
+from app.db.models import ProjectRole
 
 router = APIRouter()
 
@@ -23,6 +25,7 @@ async def sign_artifact_url(
     request_id: UUID,
     artifact_and_action: str,
     expires: int = 3600,
+    principal = Depends(get_current_principal),
 ) -> dict:
     """Return a signed URL for an artifact when called as /{artifact_id}:sign.
 
@@ -40,6 +43,9 @@ async def sign_artifact_url(
     request_obj = await crud.request.get(db=db, id=request_id)
     if not request_obj:
         raise HTTPException(status_code=404, detail="Request not found")
+
+    # Authorization: require read:artifacts or VIEWER+
+    await require_project_scope(str(request_obj.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
 
     artifact = await crud.artifact.get(db=db, id=artifact_id)
     if artifact is None or getattr(artifact, "request_id", None) != request_id:
@@ -66,6 +72,7 @@ async def read_artifacts(
     *,
     db: AsyncSession = Depends(get_db),
     request_id: UUID,
+    principal = Depends(get_current_principal),
 ) -> List[schemas.Artifact]:
     """
     Get artifacts for a request.
@@ -74,6 +81,7 @@ async def read_artifacts(
     request = await crud.request.get(db=db, id=request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
+    await require_project_scope(str(request.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
     
     artifacts = await crud.artifact.get_by_request(db, request_id=request_id)
     return artifacts
@@ -85,6 +93,7 @@ async def read_artifact(
     db: AsyncSession = Depends(get_db),
     request_id: UUID,
     artifact_id: UUID,
+    principal = Depends(get_current_principal),
 ) -> schemas.Artifact:
     """
     Get specific artifact by ID.
@@ -93,6 +102,7 @@ async def read_artifact(
     request = await crud.request.get(db=db, id=request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
+    await require_project_scope(str(request.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
     
     artifact = await crud.artifact.get(db=db, id=artifact_id)
     if not artifact or artifact.request_id != request_id:

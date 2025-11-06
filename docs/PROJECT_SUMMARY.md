@@ -222,7 +222,7 @@ The GitHub Actions pipeline automatically:
 2. **Database Schema**: Add your data models in `apps/backend/app/db/`
 3. **API Endpoints**: Implement your synthetic data generation endpoints
 4. **Frontend Components**: Build out the synthetic data wizard interface
-5. **Authentication**: Add user management and JWT authentication
+5. **Authentication**: OIDC scaffolding + project-scoped API keys with RBAC implemented (see `apps/backend/docs/SECURITY.md`)
 6. **Data Generators**: Implement synthetic data generation algorithms
 7. **File Processing**: Add support for various data formats (CSV, JSON, Parquet)
 

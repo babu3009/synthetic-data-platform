@@ -204,3 +204,24 @@ class AuditEvent(Base):
 
     # Relationships
     project = relationship("Project", back_populates="audit_events")
+
+
+class ProjectRole(str, enum.Enum):
+    OWNER = "OWNER"
+    EDITOR = "EDITOR"
+    VIEWER = "VIEWER"
+
+
+class ProjectMember(Base):
+    """Membership and RBAC role per project for a user (OIDC subject/email)."""
+    __tablename__ = "project_members"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
+    user_sub = Column(String(255), nullable=False, index=True)
+    role = Column(Enum(ProjectRole), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    project = relationship("Project")

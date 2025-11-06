@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented a complete database layer for the Synthetic Data Platform backend with SQLAlchemy models, Alembic migrations, Pydantic schemas, FastAPI CRUD operations, and comprehensive tests.
+Successfully implemented a complete database layer for the Synthetic Data Platform backend with SQLAlchemy models, Alembic migrations, Pydantic schemas, FastAPI CRUD operations, comprehensive tests, and security features (OIDC scaffolding, project-scoped API keys, and RBAC).
 
 ## What Was Implemented
 
@@ -79,6 +79,17 @@ Created RESTful API endpoints following best practices:
 - GET /{id} - Get specific artifact
 
 **Location**: `apps/backend/app/api/api_v1/endpoints/` (projects.py, requests.py, artifacts.py)
+
+#### Security & Auth
+- `GET /api/v1/auth/login` – Returns OIDC authorize URL (scaffold)
+- `GET /api/v1/auth/callback` – Verifies ID token using JWKS if provided (scaffold)
+- `GET /api/v1/projects/{project_id}/api-keys/` – List API keys (OWNER)
+- `POST /api/v1/projects/{project_id}/api-keys/` – Create API key (OWNER; returns plaintext once)
+- `DELETE /api/v1/projects/{project_id}/api-keys/{key_id}` – Revoke API key (OWNER)
+
+Authorization combines API key scopes and user RBAC roles via `require_project_scope`.
+
+**Location**: `apps/backend/app/security/auth.py`, `apps/backend/app/api/api_v1/endpoints/api_keys.py`, `apps/backend/app/api/api_v1/endpoints/auth.py`
 
 ### 5.1 Flat data generation – new API endpoints
 
@@ -170,6 +181,9 @@ Created three test suites with 30+ test cases:
 - Duplicate detection
 - Relationship validation
 
+#### Auth Tests (`tests/test_auth_api_keys.py`)
+- API key scope enforcement and RBAC role checks for protected routes
+
 **Test Configuration**:
 - Async test support with `pytest-asyncio`
 - SQLite test database for isolation
@@ -200,6 +214,11 @@ Created comprehensive documentation:
 - Troubleshooting guide
 - Development workflow
 - Testing instructions
+
+#### Security Guide (`apps/backend/docs/SECURITY.md`)
+- OIDC environment configuration
+- API key scopes and RBAC roles
+- Authorization model and testing tips
 
 ### 9. Makefile Updates
 
@@ -324,10 +343,9 @@ docs/
 
 ### Short Term
 1. Implement RQ worker for background processing
-2. Add JWT authentication
-3. Implement API key authentication
-4. Connect MinIO for file storage
-5. Add request status transitions
+2. Expand OIDC to full authorization code flow
+3. Connect MinIO for file storage
+4. Add request status transitions
 
 ### Medium Term
 1. Implement actual data generation engine

@@ -151,6 +151,22 @@ The database schema consists of 7 core models representing the synthetic data ge
 - **Path Parameters**: `request_id` (UUID), `artifact_id` (UUID)
 - **Response**: `Artifact` object or 404
 
+### Authentication and API Keys
+
+#### OIDC (scaffold)
+- `GET /api/v1/auth/login` – Returns provider authorize URL
+- `GET /api/v1/auth/callback` – Verifies `id_token` using provider JWKS when supplied
+
+Environment:
+- `SECRET_KEY` (required), `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`, `OIDC_SCOPES`
+
+#### API Key Management (OWNER role required)
+- `GET /api/v1/projects/{project_id}/api-keys/` – List keys
+- `POST /api/v1/projects/{project_id}/api-keys/` – Create key (returns plaintext once)
+- `DELETE /api/v1/projects/{project_id}/api-keys/{key_id}` – Revoke key
+
+Authorization model combines API key scopes with user RBAC; see `apps/backend/docs/SECURITY.md` for details.
+
 ## CRUD Operations
 
 ### Base CRUD Class
@@ -264,10 +280,14 @@ cd apps/backend && poetry run pytest tests/test_models.py
 
 ## Security Considerations
 
-### API Keys (Future Implementation)
-- **Hashed Storage**: API keys stored as hashes, never plain text
-- **Scoped Access**: Granular permission system via scopes array
+### API Keys
+- **Hashed Storage**: API keys stored as SHA-256 hashes (peppered with `SECRET_KEY`)
+- **Scoped Access**: Granular permission system via scopes array (`read:project`, `write:project`, `run:request`, `read:artifacts`)
 - **Project Association**: Keys tied to specific projects
+
+### OIDC
+- **Verification**: Minimal JWKS-based ID token verification; full code flow can be added later
+- **Dependency**: Uses `python-jose` when available; otherwise returns `501` for verification attempts
 
 ### Audit Trail
 - **Comprehensive Logging**: All actions logged via AuditEvent model
@@ -296,10 +316,9 @@ cd apps/backend && poetry run pytest tests/test_models.py
 4. **Progress Tracking**: Real-time progress updates
 
 ### API Enhancements
-1. **Authentication**: Implement JWT-based authentication
-2. **Authorization**: Role-based access control with API keys
-3. **Filtering**: Advanced filtering for list endpoints
-4. **Webhooks**: Event notifications for request completion
+1. **Auth Flow**: Expand OIDC to full authorization code flow with refresh tokens
+2. **Filtering**: Advanced filtering for list endpoints
+3. **Webhooks**: Event notifications for request completion
 
 ### Monitoring & Observability
 1. **Metrics**: Request processing metrics and performance tracking

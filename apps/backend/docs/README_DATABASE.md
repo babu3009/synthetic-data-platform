@@ -41,7 +41,17 @@ This starts:
 
 Wait a few seconds for the services to be ready.
 
-### 3. Generate Initial Migration
+### 3. Configure Environment
+
+Copy `apps/backend/.env.example` to `apps/backend/.env` and set at least:
+
+- `SECRET_KEY` (required) – a strong random value
+- Optional OIDC settings to enable login redirect/callback:
+  - `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`, `OIDC_SCOPES`
+
+See also `apps/backend/docs/SECURITY.md` for details on authentication, API keys, and RBAC.
+
+### 4. Generate Initial Migration
 
 From the backend directory:
 ```bash
@@ -54,14 +64,14 @@ Or use the setup script:
 python setup_db.py
 ```
 
-### 4. Run Migrations
+### 5. Run Migrations
 
 Apply the migration to create all database tables:
 ```bash
 poetry run alembic upgrade head
 ```
 
-### 5. Seed Sample Data
+### 6. Seed Sample Data
 
 Populate the database with sample data:
 ```bash
@@ -75,7 +85,7 @@ This creates:
 - 3 sample configurations
 - 3 sample artifacts
 
-### 6. Start the Backend Server
+### 7. Start the Backend Server
 
 ```bash
 poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -85,7 +95,7 @@ The API will be available at: http://localhost:8000
 
 API Documentation (Swagger): http://localhost:8000/docs
 
-### 7. Verify Installation
+### 8. Verify Installation
 
 Run the validation script:
 ```bash
@@ -111,6 +121,13 @@ You should see all 23 components marked as ✅.
 - `GET /api/v1/projects/{project_id}/requests/{id}` - Get specific request
 
 ### Artifacts
+- `GET /api/v1/auth/login` – Returns OIDC authorize URL (scaffold)
+- `GET /api/v1/auth/callback` – Verifies `id_token` if provided (scaffold)
+- `GET /api/v1/projects/{project_id}/api-keys/` – List API keys (OWNER)
+- `POST /api/v1/projects/{project_id}/api-keys/` – Create API key (OWNER; returns plaintext once)
+- `DELETE /api/v1/projects/{project_id}/api-keys/{key_id}` – Revoke API key (OWNER)
+
+See `apps/backend/docs/SECURITY.md` for auth model, scopes, and roles.
 
 - `GET /api/v1/requests/{request_id}/artifacts` - List request artifacts
 - `GET /api/v1/requests/{request_id}/artifacts/{id}` - Get specific artifact
