@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useReducer } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 
 export type Column = {
   name: string
@@ -56,6 +56,8 @@ export type WizardState = {
   entities: EntitySchema[]
   selectedEntityId?: string
   activeTab?: 'entities' | 'diagram' | 'providers' | 'rules' | 'run'
+  isDirty?: boolean
+  lastSavedAt?: string
 }
 
 type Action =
@@ -70,6 +72,7 @@ type Action =
   | { type: 'upsertRelationship'; entityId: string; rel: Relationship }
   | { type: 'deleteRelationship'; entityId: string; relId: string }
   | { type: 'saveLayout'; entityId: string; layout: Record<string, { x: number; y: number }> }
+  | { type: 'clearDirty'; savedAt?: string }
   | {
       type: 'applyProviderSuggestions'
       entityId: string
@@ -95,6 +98,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         ...state,
         entities: [entity, ...state.entities.filter((e) => e.id !== id)],
         selectedEntityId: id,
+        isDirty: true,
       }
     }
     case 'setSelectedEntity':
@@ -103,7 +107,7 @@ function reducer(state: WizardState, action: Action): WizardState {
       return { ...state, activeTab: action.tab }
     case 'updateEntity': {
       const entities = state.entities.map((e) => (e.id === action.id ? { ...e, ...action.patch, updatedAt: new Date().toISOString() } : e))
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'updateTable': {
       const entities = state.entities.map((e) => {
@@ -111,7 +115,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         const tables = e.tables.map((t) => (t.name === action.tableName ? { ...t, ...action.patch } : t))
         return { ...e, tables, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'updateColumn': {
       const entities = state.entities.map((e) => {
@@ -123,7 +127,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         })
         return { ...e, tables, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'togglePk': {
       const entities = state.entities.map((e) => {
@@ -137,7 +141,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         })
         return { ...e, tables, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'upsertRelationship': {
       const entities = state.entities.map((e) => {
@@ -148,7 +152,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         else rels.unshift(action.rel)
         return { ...e, relationships: rels, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'deleteRelationship': {
       const entities = state.entities.map((e) => {
@@ -156,11 +160,14 @@ function reducer(state: WizardState, action: Action): WizardState {
         const rels = (e.relationships || []).filter((r) => r.id !== action.relId)
         return { ...e, relationships: rels, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     case 'saveLayout': {
       const entities = state.entities.map((e) => (e.id === action.entityId ? { ...e, layout: action.layout, updatedAt: new Date().toISOString() } : e))
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
+    }
+    case 'clearDirty': {
+      return { ...state, isDirty: false, lastSavedAt: action.savedAt || new Date().toISOString() }
     }
     case 'applyProviderSuggestions': {
       const entities = state.entities.map((e) => {
@@ -183,7 +190,7 @@ function reducer(state: WizardState, action: Action): WizardState {
         })
         return { ...e, tables, updatedAt: new Date().toISOString() }
       })
-      return { ...state, entities }
+      return { ...state, entities, isDirty: true }
     }
     default:
       return state
@@ -201,7 +208,34 @@ export function WizardProvider({ children, initialProjectId }: { children: React
     entities: [],
     selectedEntityId: undefined,
     activeTab: 'entities',
+    isDirty: false,
   })
+
+  // Draft rehydration: load any autosaved entities for the project
+  useEffect(() => {
+    if (!state.projectId) return
+    try {
+      const prefix = `autosave:${state.projectId || 'default'}:`
+      const keys = Object.keys(localStorage)
+      const drafts = keys.filter((k) => k.startsWith(prefix))
+      if (drafts.length === 0) return
+      drafts.forEach((k) => {
+        try {
+          const raw = localStorage.getItem(k)
+          if (!raw) return
+          const entity = JSON.parse(raw) as EntitySchema
+          if (!state.entities.some((e) => e.id === entity.id)) {
+            dispatch({ type: 'addEntity', entity })
+          }
+        } catch (_) {
+          // ignore malformed
+        }
+      })
+    } catch (_) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.projectId])
 
   const value = useMemo(() => ({ state, dispatch }), [state])
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>

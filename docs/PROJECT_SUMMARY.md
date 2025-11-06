@@ -254,6 +254,12 @@ Planned next steps:
    - Providers inference: `useInferProviders(projectId)`
    - Rules validation: `useValidate(projectId)`
 
+   ### 💾 Autosave and Drafts
+
+   - Autosave: Diagram and Providers tabs automatically autosave changes after ~800ms of inactivity (localStorage fallback).
+   - Dirty navigation guard: prompts when leaving with unsaved changes, including tab switches.
+   - Draft mode: partially defined entities are saved per project and rehydrated on load so users can resume later.
+
 ## 📚 Additional Resources
 
 - **FastAPI Docs**: https://fastapi.tiangolo.com/

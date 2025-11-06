@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Alert, Button, Col, Form, Modal, Row, Table } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
-import { inferProviders, saveProviders, type ProviderSuggestion } from '../../services/providers'
+import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
 import { autosaveEntity } from '../../services/entities'
+import { useAutosave } from '../../hooks/use_autosave'
 
 function validateConfig(provider: Column['provider'], cfg: Column['providerConfig']): string | null {
   if (!provider) return null
@@ -113,7 +114,6 @@ export default function ProvidersPiiPage() {
     return rows
   }, [entity, tableFilter])
 
-  if (!entity) return <Alert variant="info">Select or create an entity to configure providers and PII.</Alert>
 
   const providerOptions: Column['provider'][] = [
     'faker',
@@ -147,7 +147,7 @@ export default function ProvidersPiiPage() {
       const parsed = value.trim() ? JSON.parse(value) : undefined
       dispatch({ type: 'updateColumn', entityId: entity.id, tableName: table, columnName: col.name, patch: { providerConfig: parsed } })
       setError(null)
-    } catch (e: any) {
+    } catch (e: unknown) {
       setError('Config must be valid JSON')
     }
   }
@@ -232,6 +232,8 @@ export default function ProvidersPiiPage() {
         }
       }
       await saveProviders(projectId, entity.id, providers)
+      // Clear dirty on successful explicit save
+      dispatch({ type: 'clearDirty' })
     } catch (e: unknown) {
       // Show non-blocking error; localStorage fallback already attempted in service
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -242,8 +244,32 @@ export default function ProvidersPiiPage() {
     }
   }
 
+  // Debounced autosave (800ms) for providers changes
+  useAutosave([entity, projectId], async () => {
+    if (!entity) return
+    await autosaveEntity(projectId, entity)
+    // Save a lightweight providers-only snapshot too
+    const providers: ProviderSuggestion[] = []
+    for (const t of entity.tables) {
+      for (const c of t.columns) {
+        providers.push({
+          table: t.name,
+          column: c.name,
+          provider: c.provider,
+          providerConfig: c.providerConfig,
+          pii: c.pii,
+          piiSubtype: c.piiSubtype,
+        })
+      }
+    }
+    autosaveProviders(projectId, entity.id, providers)
+  }, 800, () => dispatch({ type: 'clearDirty' }))
+
   return (
     <div>
+      {!entity && <Alert variant="info">Select or create an entity to configure providers and PII.</Alert>}
+      {entity && (
+      <>
       {error && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}
@@ -369,6 +395,8 @@ export default function ProvidersPiiPage() {
         diffs={diffs}
         onConfirm={handleApplyDiffs}
       />
+      </>
+      )}
     </div>
   )
 }

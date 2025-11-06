@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Tabs, Tab, Container } from 'react-bootstrap'
 import { useSearchParams } from 'react-router-dom'
 import { WizardProvider, useWizard } from '../state/wizard'
+import { useUnsavedChangesWarning } from '../hooks/use_unsaved_changes'
 import EntitiesPage from './wizard/entities_page'
 import DiagramPage from './wizard/diagram_page'
 import ProvidersPiiPage from './wizard/providers_pii_page'
@@ -11,6 +12,9 @@ import OutputsRunPage from './wizard/outputs_run_page'
 function WizardInner() {
   const { state, dispatch } = useWizard()
   const [params] = useSearchParams()
+
+  // Global unsaved-changes guard
+  const { confirmProceed } = useUnsavedChangesWarning(state.isDirty)
 
   useEffect(() => {
     const pid = params.get('projectId') || undefined
@@ -22,12 +26,11 @@ function WizardInner() {
       <h2 className="mb-3">Data Wizard</h2>
       <Tabs
         activeKey={state.activeTab || 'entities'}
-        onSelect={(k) =>
-          dispatch({
-            type: 'setActiveTab',
-            tab: ((k as 'entities' | 'diagram' | 'providers' | 'rules' | 'run' | null) || 'entities'),
-          })
-        }
+        onSelect={(k) => {
+          const next = ((k as 'entities' | 'diagram' | 'providers' | 'rules' | 'run' | null) || 'entities')
+          if (!confirmProceed()) return
+          dispatch({ type: 'setActiveTab', tab: next })
+        }}
       >
         <Tab eventKey="entities" title="Entities">
           <div className="pt-3">

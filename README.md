@@ -117,6 +117,11 @@ make seed             # Seed database with sample data
 - Rules: split editor for YAML/JSON rules with inline linting (implication, uniqueness, distribution, temporal), one-click dry-run validation via POST /api/v1/validate with compact report for sample vs final data
 - Outputs & Run: pick output formats (CSV/XLSX/Parquet/JSONL), destination, optional schedule; compute estimates via `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate`; create and start requests; navigate to Request Detail with live status polling and artifact links (`GET /api/v1/requests/{request_id}/artifacts`).
 
+#### Saving and drafts
+- Autosave: Diagram and Providers tabs autosave after ~800ms of inactivity (best-effort, localStorage fallback).
+- Dirty guard: the wizard warns when navigating away with unsaved changes; tab switches prompt for confirmation.
+- Draft mode: partially defined entities are preserved per project and rehydrated on load so users can return later.
+
 ### Client types and hooks
 
 - Shared types and Zod schemas live in `apps/frontend/src/types/schema.ts` and cover entities, tables/columns, relationships, providers, distributions, and rule definitions.

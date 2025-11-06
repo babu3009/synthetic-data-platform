@@ -94,3 +94,10 @@ This document captures planned enhancements, grouped by area, to pick up after t
 ---
 
 This list mirrors the in-editor task tracker and can be maintained alongside code reviews and milestones.
+
+## Recently Completed
+
+- [x] Autosave & dirty-nav guard
+  - Added 800ms autosave for Diagram and Providers tabs, tracked dirty flag, and warned on navigating away with unsaved changes.
+- [x] Draft mode for entities
+  - Autosaved partial entities per project and rehydrated them on load so users can leave and return later.

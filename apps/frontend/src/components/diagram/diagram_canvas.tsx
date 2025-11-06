@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import ReactFlow, {
   addEdge,
   Background,
@@ -20,6 +20,7 @@ import EdgePanel from './edge_panel'
 import ColumnEditorModal from './column_editor_modal'
 import { autoLayout } from '../../utils/layout'
 import { autosaveEntity } from '../../services/entities'
+import { useAutosave } from '../../hooks/use_autosave'
 import './diagram.css'
 
 type DiagramProps = Record<string, never>
@@ -181,18 +182,11 @@ export default function DiagramCanvas(_: DiagramProps) {
     dispatch({ type: 'setSelectedEntity', id })
   }
 
-  // Debounced autosave when entity changes
-  const autosaveTimer = useRef<number | null>(null)
-  useEffect(() => {
+  // Debounced autosave when entity changes (800ms)
+  useAutosave([entity, state.projectId], async () => {
     if (!entity) return
-    if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current)
-    autosaveTimer.current = window.setTimeout(() => {
-      autosaveEntity(state.projectId, entity)
-    }, 600)
-    return () => {
-      if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current)
-    }
-  }, [entity, state.projectId])
+    await autosaveEntity(state.projectId, entity)
+  }, 800, () => dispatch({ type: 'clearDirty' }))
 
   return (
     <div className="position-relative diagram-container">

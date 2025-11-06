@@ -46,3 +46,13 @@ export async function saveProviders(
     throw e
   }
 }
+
+// Lightweight autosave of provider selections without hitting backend
+export function autosaveProviders(projectId: string, entityId: string, providers: ProviderSuggestion[]) {
+  try {
+    const key = `providers:${projectId}:${entityId}`
+    localStorage.setItem(key, JSON.stringify(providers))
+  } catch (_) {
+    // ignore
+  }
+}
