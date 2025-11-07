@@ -42,6 +42,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 export function AppNavbar() {
   const location = useLocation()
+  // Derive a current projectId from URL if present so links can be project-scoped
+  const projectMatch = location.pathname.match(/\/projects\/([^/]+)/)
+  const projectId = projectMatch ? projectMatch[1] : undefined
+  const llmSettingsHref = projectId ? `/projects/${projectId}/llm-settings` : '/projects/placeholder/llm-settings'
+  const llmProvidersHref = projectId ? `/admin/${projectId}/llm-providers` : '/admin/llm-providers'
   return (
     <BsNavbar bg="dark" variant="dark" expand="lg" sticky="top">
       <Container>
@@ -51,23 +56,19 @@ export function AppNavbar() {
         <BsNavbar.Toggle aria-controls="basic-navbar-nav" />
         <BsNavbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
-            <Nav.Link as={Link} to="/" active={location.pathname === '/'}>
-              Home
+            <Nav.Link as={Link} to="/" active={location.pathname === '/'}>Home</Nav.Link>
+            <Nav.Link as={Link} to="/wizard" active={location.pathname === '/wizard'}>Data Wizard</Nav.Link>
+            <Nav.Link as={Link} to="/datasets" active={location.pathname === '/datasets'}>Datasets</Nav.Link>
+            <Nav.Link as={Link} to="/analytics" active={location.pathname === '/analytics'}>Analytics</Nav.Link>
+            <Nav.Link as={Link} to={llmSettingsHref} active={/llm-settings$/.test(location.pathname)} aria-label="LLM Settings">
+              LLM Settings
             </Nav.Link>
-            <Nav.Link as={Link} to="/wizard" active={location.pathname === '/wizard'}>
-              Data Wizard
-            </Nav.Link>
-            <Nav.Link as={Link} to="/datasets" active={location.pathname === '/datasets'}>
-              Datasets
-            </Nav.Link>
-            <Nav.Link as={Link} to="/analytics" active={location.pathname === '/analytics'}>
-              Analytics
+            <Nav.Link as={Link} to={llmProvidersHref} active={/llm-providers$/.test(location.pathname)} aria-label="LLM Providers Admin">
+              LLM Providers
             </Nav.Link>
           </Nav>
           <Nav>
-            <Nav.Link as={Link} to="/profile" active={location.pathname === '/profile'}>
-              Profile
-            </Nav.Link>
+            <Nav.Link as={Link} to="/profile" active={location.pathname === '/profile'}>Profile</Nav.Link>
           </Nav>
         </BsNavbar.Collapse>
       </Container>

@@ -6,7 +6,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import LLMProvider, LLMProviderKind, Project
+from app.db.models import LLMProvider, LLMProviderKind, Project, LLMModel, LLMCredential
 from app.utils.crypto import encrypt_json
 from app import crud, schemas
 
@@ -84,26 +84,14 @@ async def test_discover_models_openai_upsert(async_client: AsyncClient, db_sessi
     db_session.add(provider)
     await db_session.flush()
 
-    # Add one existing model to test dedup
-    await crud.llm_model.create(db=db_session, obj_in=schemas.LLMModelCreate(
-        name="gpt-3.5-turbo",
-        display_name="gpt-3.5-turbo",
-    ))
-    # Attach to provider by setting provider_id
-    existing = (await crud.llm_model.get_by_provider(db_session, provider_id=provider.id))
-    if not existing:
-        # manually set provider for the single created model
-        # fetch the latest created model
-        models_list = await crud.llm_model.get_by_provider(db_session, provider_id=provider.id)
+    # Add one existing model to test dedup (ensure provider_id set before commit)
+    db_session.add(LLMModel(provider_id=provider.id, name="gpt-3.5-turbo", display_name="gpt-3.5-turbo"))
+    await db_session.commit()
     
     # Create credentials
     enc = encrypt_json({"api_key": "sk-test-xyz"})
-    cred = await crud.llm_credential.create(db=db_session, obj_in=schemas.LLMCredentialUpsert(
-        api_key="sk-test-xyz", org_id=None, extra={}
-    ))
-    # Fix provider_id for created credential
-    cred.provider_id = provider.id
-    db_session.add(cred)
+    # Create credentials with provider_id set
+    db_session.add(LLMCredential(provider_id=provider.id, enc_payload_json=enc))
     await db_session.commit()
 
     # Monkeypatch httpx.AsyncClient

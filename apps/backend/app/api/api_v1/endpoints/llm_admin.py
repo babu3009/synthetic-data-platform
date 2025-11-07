@@ -12,7 +12,7 @@ import httpx
 
 from app.crud import llm_provider as crud_provider, llm_model as crud_model, llm_credential as crud_cred
 from app.db.session import get_db
-from app.db.models import AuditEvent, ProjectRole
+from app.db.models import AuditEvent, ProjectRole, LLMModel, LLMCredential
 from app.schemas.llm import (
     LLMProvider,
     LLMProviderCreate,
@@ -26,6 +26,8 @@ from app.schemas.llm import (
 )
 from app.security.auth import get_current_principal, require_project_scope
 from app.utils.crypto import encrypt_json, mask_secret
+from app.core.config import settings
+import time
 
 router = APIRouter()
 
@@ -123,9 +125,8 @@ async def upsert_provider_credentials(
         await db.refresh(existing)
         cred = existing
     else:
-        # Create new and set provider
-        cred = await crud_cred.create(db, obj_in=type("Obj", (), {"model_dump": lambda self=None: {"enc_payload_json": cipher}})())
-        cred.provider_id = provider_id
+        # Proper creation with provider_id set before commit (NOT NULL constraint)
+        cred = LLMCredential(provider_id=provider_id, enc_payload_json=cipher)
         db.add(cred)
         await db.commit()
         await db.refresh(cred)
@@ -172,9 +173,16 @@ async def create_model(
     if not prov:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    # Create model under provider
-    db_model = await crud_model.create(db, obj_in=body)
-    db_model.provider_id = provider_id
+    # Create model under provider ensuring provider_id is set before commit
+    db_model = LLMModel(
+        provider_id=provider_id,
+        name=body.name,
+        display_name=body.display_name,
+        context_tokens=body.context_tokens,
+        supports_json=body.supports_json,
+        is_default=body.is_default,
+        metadata_json=body.metadata_json or {},
+    )
     db.add(db_model)
     await db.commit()
     await db.refresh(db_model)
@@ -201,10 +209,91 @@ async def probe_provider(
     prov = await crud_provider.get(db, id=provider_id)
     if not prov:
         raise HTTPException(status_code=404, detail="Provider not found")
+    actor = getattr(principal, "actor", "unknown")
     if not prov.is_enabled:
+        if settings.FF_ENABLE_PROBE_AUDIT:
+            db.add(AuditEvent(actor=actor, project_id=project_id, action="llm.provider.probe", payload_json={
+                "provider_id": str(provider_id), "ok": False, "message": "provider disabled"
+            }))
+            await db.commit()
         return ProbeResponse(ok=False, message="Provider is disabled")
-    # For now, we do a no-op probe. Future: attempt a trivial call using configured base_url/credentials.
-    return ProbeResponse(ok=True, message="Probe succeeded (no-op)")
+
+    # Attempt a lightweight provider-specific probe with short timeout
+    # Credentials (if any)
+    api_key: Optional[str] = None
+    cred = await crud_cred.get_by_provider(db, provider_id=provider_id)
+    if cred is not None:
+        try:
+            from app.utils.crypto import decrypt_json
+            payload = decrypt_json(cred.enc_payload_json)
+            api_key = (payload or {}).get("api_key")
+        except Exception:
+            api_key = None
+
+    base_url = (prov.base_url or "").rstrip("/")
+    kind = str(prov.kind.value)
+    started = time.monotonic()
+    ok = False
+    message = "unknown"
+    try:
+        timeout = httpx.Timeout(3.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            headers = {}
+            if kind in ("openai", "anthropic") and not api_key:
+                message = "missing credentials"
+            else:
+                if kind == "openai":
+                    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+                    url = (base_url or "https://api.openai.com/v1") + "/models"
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        ok = True
+                        message = "openai ok"
+                    elif resp.status_code == 401:
+                        message = "unauthorized"
+                    else:
+                        message = f"error status={resp.status_code}"
+                elif kind == "anthropic":
+                    headers = {"x-api-key": api_key} if api_key else {}
+                    url = (base_url or "https://api.anthropic.com") + "/v1/models"
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        ok = True
+                        message = "anthropic ok"
+                    elif resp.status_code == 401:
+                        message = "unauthorized"
+                    else:
+                        message = f"error status={resp.status_code}"
+                elif kind == "ollama":
+                    test_url = (base_url or "http://localhost:11434") + "/api/tags"
+                    resp = await client.get(test_url)
+                    if resp.status_code == 200:
+                        ok = True
+                        message = "ollama ok"
+                    else:
+                        message = f"error status={resp.status_code}"
+                elif kind == "lmstudio":
+                    test_url = (base_url or "http://localhost:1234") + "/v1/models"
+                    resp = await client.get(test_url)
+                    if resp.status_code == 200:
+                        ok = True
+                        message = "lmstudio ok"
+                    else:
+                        message = f"error status={resp.status_code}"
+                else:
+                    message = "unsupported provider kind"
+    except httpx.TimeoutException:
+        message = "timeout"
+    except Exception as e:
+        message = f"exception: {type(e).__name__}"
+
+    latency_ms = int((time.monotonic() - started) * 1000)
+    if settings.FF_ENABLE_PROBE_AUDIT:
+        db.add(AuditEvent(actor=actor, project_id=project_id, action="llm.provider.probe", payload_json={
+            "provider_id": str(provider_id), "ok": ok, "message": message, "latency_ms": latency_ms
+        }))
+        await db.commit()
+    return ProbeResponse(ok=ok, message=f"{message}; latency_ms={latency_ms}")
 
 
 @router.post("/providers/{provider_id}:discover-models", response_model=DiscoverModelsResponse)
@@ -418,16 +507,15 @@ async def discover_models(
             else:
                 unchanged += 1
         else:
-            db_model = await crud_model.create(db, obj_in=LLMModelCreate(
+            db_model = LLMModel(
+                provider_id=provider_id,
                 name=name,
                 display_name=display_name,
                 context_tokens=context_tokens,
                 supports_json=supports_json,
                 is_default=False,
-                metadata_json=metadata_json,
-            ))
-            # Attach to provider
-            db_model.provider_id = provider_id
+                metadata_json=metadata_json or {},
+            )
             db.add(db_model)
             await db.commit()
             await db.refresh(db_model)

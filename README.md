@@ -181,7 +181,7 @@ make seed             # Seed database with sample data
 ## Observability
 
 - Metrics endpoint: `GET http://localhost:8000/metrics` (Prometheus format)
-- Tracing (optional): enable OpenTelemetry OTLP export by setting `OTEL_EXPORTER_OTLP_ENDPOINT` in the backend environment.
+- Tracing (optional): enable OpenTelemetry OTLP export by setting `OTEL_EXPORTER_OTLP_ENDPOINT` in the backend environment. See `docs/TRACING_RATE_LIMIT.md` for details.
 - Custom counters exposed:
    - `synth_requests_started_total{type=...}`
    - `synth_requests_completed_total{type=...}`

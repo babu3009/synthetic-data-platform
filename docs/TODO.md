@@ -57,15 +57,19 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Optional: surface under a project-scoped menu.
 - [ ] Manual smoke test
   - Run frontend locally and verify: settings load/save, role-based disables, provider/model filtering, and Test Suggestion results.
+ - [ ] LLM Settings page tests
+   - Role gating (OWNER/EDITOR vs VIEWER), model filtering, advanced params persistence, Test Suggestion panel wiring.
+ - [ ] Tracing & rate-limit docs
+   - Add consolidated doc (TRACING_RATE_LIMIT.md) detailing env vars, audit events, and production migration notes.
 
 #### Backend Enhancements (recently added)
 - [x] Provider/model ownership validation
   - Server-side check in PUT `/api/v1/projects/{projectId}/llm-settings` ensures `model_id` belongs to `provider_id`; returns 422 otherwise.
 - [x] Per-project inference rate limit
   - Added in-memory limiter (60/min) for `POST /api/v1/projects/{projectId}/infer/providers` with 429 and audit `llm.infer.rate_limited`.
-- [ ] Audit probe events
+- [x] Audit probe events
   - Emit audit event for provider probe (`llm.provider.probe`) to complete coverage.
-- [ ] Assert audit in rate limit tests
+- [x] Assert audit in rate limit tests
   - Extend test to verify `llm.infer.rate_limited` audit row insertion.
 
 - [ ] Rules tab persistence

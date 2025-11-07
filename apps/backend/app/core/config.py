@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
     
+    # External URLs (optional)
+    FRONTEND_URL: Optional[str] = None
+    BACKEND_PUBLIC_URL: Optional[str] = None
+    
     # CORS settings
     # Use plain strings here to avoid AnyHttpUrl validation errors for dev loopback origins.
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -66,6 +70,13 @@ class Settings(BaseSettings):
 
     # JWT settings
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    
+    # OIDC (optional; leave unset to disable)
+    OIDC_ISSUER: Optional[str] = None
+    OIDC_CLIENT_ID: Optional[str] = None
+    OIDC_CLIENT_SECRET: Optional[str] = None
+    OIDC_REDIRECT_URI: Optional[str] = None
+    OIDC_SCOPES: Optional[str] = None
     
     # Data generation settings
     MAX_ROWS_PER_GENERATION: int = 1_000_000

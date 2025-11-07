@@ -227,6 +227,7 @@ Endpoints:
 - `GET /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – List models
 - `POST /api/v1/admin/llm/providers/{provider_id}/models?project_id={project_id}` – Create model
 - `POST /api/v1/admin/llm/providers/{provider_id}:probe?project_id={project_id}` – Probe provider (no-op stub now)
+ - `POST /api/v1/admin/llm/providers/{provider_id}:probe?project_id={project_id}` – Probe provider (no-op stub emits audit `llm.provider.probe` when `FF_ENABLE_PROBE_AUDIT=true`)
 - `POST /api/v1/admin/llm/providers/{provider_id}:discover-models?project_id={project_id}` – Discover models (fetches from provider, upserts without duplicates, returns diff summary)
 
 Example payloads:
@@ -329,6 +330,7 @@ Implementation details:
 - Current limiter is an in-memory dictionary keyed by `(project_id, minute_epoch)`; suitable for single-process dev.
 - For multi-process / horizontal scaling, replace with Redis (e.g., Lua script INCR with TTL) or a token bucket in a shared store.
 - Code location: `app/api/api_v1/endpoints/infer.py` (`_SimpleProjectRateLimiter`).
+ - Audit action when exceeded (flag on): `llm.infer.rate_limited` with payload `{ "limit": <int> }`.
 
 Override example:
 ```powershell
@@ -343,6 +345,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_SERVICE_NAME=synthetic-data-backend
 ```
 With tracing enabled, request spans can assist in diagnosing inference latency.
+ See `docs/TRACING_RATE_LIMIT.md` for detailed setup and production notes.
 
 ### LLM Client Factory (internal)
 

@@ -41,6 +41,10 @@ pip freeze > requirements.txt
 - **Select Interpreter**: `Ctrl+Shift+P` → "Python: Select Interpreter"
 - Current: `Python 3.11.14 ('conda-synthetic-data')`
 
+### Environment files
+- Local: copy `apps/backend/.env.example` to `.env` and edit values.
+- Production: use `apps/backend/.env.prod.example` as a hardened template; inject real secrets via a vault.
+
 ### Development Commands
 ```powershell
 # Activate first!
@@ -120,6 +124,8 @@ python -c "import sys; print(sys.executable)"
  - Backend validation: `PUT /api/v1/projects/{projectId}/llm-settings` enforces `model_id` belongs to `provider_id` (422 on mismatch).
  - Rate limiting: `POST /api/v1/projects/{projectId}/infer/providers` capped at 60/min per project → 429 + audit `llm.infer.rate_limited` when exceeded.
  - Rate limiting: `POST /api/v1/projects/{projectId}/infer/providers` capped at `INFER_RATE_LIMIT_PER_MINUTE` (env, default 60) per project → 429 + optional audit `llm.infer.rate_limited` (flag `FF_ENABLE_RATE_LIMIT_AUDIT`).
+ - Probe auditing: `POST /api/v1/admin/llm/providers/{providerId}:probe` now emits `llm.provider.probe` audit event (flag `FF_ENABLE_PROBE_AUDIT`) including success/disabled state.
+ - See `docs/TRACING_RATE_LIMIT.md` for consolidated tracing + rate limit configuration guidance.
 
 ### Quick Links
 - Outputs configuration: see `apps/backend/docs/OUTPUTS.md`
