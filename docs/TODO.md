@@ -53,14 +53,13 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Physically delete `ProviderFormModal.tsx`, `CredentialsModal.tsx`, `DiscoverDrawer.tsx` when safe (Windows case-collision handled).
 - [x] Project → LLM Settings page (OWNER/EDITOR editable)
   - Enable toggle, provider and model selects (filtered to enabled), advanced tuning (temperature/top_p/max_tokens), guardrails (PII block, tool use), Test Suggestion panel.
-- [ ] Add navbar link to LLM Settings
-  - Optional: surface under a project-scoped menu.
 - [ ] Manual smoke test
   - Run frontend locally and verify: settings load/save, role-based disables, provider/model filtering, and Test Suggestion results.
- - [ ] LLM Settings page tests
-   - Role gating (OWNER/EDITOR vs VIEWER), model filtering, advanced params persistence, Test Suggestion panel wiring.
- - [ ] Tracing & rate-limit docs
-   - Add consolidated doc (TRACING_RATE_LIMIT.md) detailing env vars, audit events, and production migration notes.
+- [ ] LLM Settings page tests (advanced)
+  - Add coverage for advanced params persistence (temperature/top_p/max_tokens) and guardrails toggles; assert payloads on save.
+- [ ] Manual smoke test
+  - Run frontend locally and verify: settings load/save, role-based disables, provider/model filtering, and Test Suggestion results.
+
 
 #### Backend Enhancements (recently added)
 - [x] Provider/model ownership validation
@@ -103,8 +102,8 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 ### LLM Client & Adapters
 
-- [ ] Connectivity probes (real)
-  - Replace heuristic `probe()` implementations with targeted health checks per provider (e.g., list models or lightweight ping), with retry and timeout tuning.
+- [ ] Integration tests
+  - Add tests that decrypt credentials and exercise factory with mocked HTTP across adapters; include negative cases (disabled provider, bad key).
 - [x] Model discovery endpoints
   - Implemented real `:discover-models` for OpenAI, Anthropic, Ollama, LM Studio with per-provider parsing, upsert, diff summary, and audit logging.
   - Follow-ups below extend tests and robustness.
@@ -128,8 +127,8 @@ This document captures planned enhancements, grouped by area, to pick up after t
 #### New Follow-ups (Post Discovery Implementation)
 - [ ] Discovery tests (Anthropic & LM Studio)
   - Add unit tests mirroring OpenAI/Ollama coverage for Anthropic and LM Studio discovery parsing and diff counters.
-- [ ] Probe endpoint real call
-  - Replace no-op `:probe` with provider-specific light calls (e.g., list models head/ping) and capture latency + error classification.
+- [ ] Error taxonomy & logging
+  - Standardize exceptions for network, auth, rate-limit, and schema parsing; surface structured error codes in probe/discover responses.
 - [ ] Error taxonomy & logging
   - Standardize exceptions for network, auth, rate-limit, and schema parsing; surface structured error codes in probe/discover responses.
 - [ ] Default model policy
@@ -172,6 +171,24 @@ This document captures planned enhancements, grouped by area, to pick up after t
 ---
 
 This list mirrors the in-editor task tracker and can be maintained alongside code reviews and milestones.
+
+## ✅ Done
+
+- [x] Add navbar link to LLM Settings and LLM Providers (project-scoped when URL contains projectId)
+  - Commit: a697cc3a
+  - Added links in `src/main.tsx` with auto-detected projectId from path; includes fallbacks when absent.
+- [x] LLM Settings page tests (base)
+  - Commit: a697cc3a
+  - Added tests for role gating (VIEWER disables), model filtering per provider, Test Suggestion panel wiring, and Save submission payload.
+- [x] Tracing & rate-limit docs
+  - Commit: a697cc3a
+  - Created `TRACING_RATE_LIMIT.md`, linked from backend docs and root, and referenced settings/env toggles.
+- [x] Connectivity probes (real) and probe endpoint real call
+  - Commit: a697cc3a
+  - Implemented provider-specific lightweight probes (OpenAI/Anthropic/Ollama/LM Studio) with timeout, latency_ms in audit, and error classification.
+- [x] Fix discover-models provider_id NOT NULL bug
+  - Commit: a697cc3a
+  - Ensure models and credentials are created with provider_id set pre-commit; adjusted tests accordingly.
 
 ## Recently Completed
 
