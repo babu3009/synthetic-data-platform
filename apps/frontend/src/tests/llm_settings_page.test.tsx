@@ -114,4 +114,23 @@ describe('LLM Settings Page', () => {
     expect(inferMutate).toHaveBeenCalled()
     expect(await screen.findByText(/Test Suggestions/i)).toBeInTheDocument()
   })
+
+  it('submits and calls save with current settings', async () => {
+    localStorage.setItem('role', 'OWNER')
+    renderWithProviders()
+
+    const saveBtn = await screen.findByRole('button', { name: /save settings/i })
+    saveMutate.mockReset()
+    saveMutate.mockImplementation(() => {})
+
+    saveBtn && saveBtn.click()
+
+    expect(saveMutate).toHaveBeenCalled()
+    // Validate essential fields are passed through
+    const payload = saveMutate.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      enabled: true,
+      provider_id: 'prov1',
+    })
+  })
 })
