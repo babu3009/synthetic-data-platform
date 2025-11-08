@@ -8,7 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/tests/setup.ts',
     coverage: {
-      enabled: true,
+      provider: 'v8',
       reporter: ['text', 'lcov'],
       lines: 80,
       functions: 80,

@@ -14,6 +14,10 @@ synthetic-data-platform/
 └── .github/workflows/   # CI/CD pipelines
 ```
 
+## Task Tracker
+
+The unified project task list (backend, frontend, CI, docs) now lives at [`docs/TODO.md`](docs/TODO.md). Each item is labeled with scope tags like `[frontend]`, `[backend]`, or `[both]` plus domains (e.g. `[ci]`, `[docs]`, `[test]`). Use this as the single source of truth for planning and reviews.
+
 ## Quick Start
 
 ### Prerequisites
@@ -116,7 +120,7 @@ Docker backend test target is now available:
 make backend-test-docker
 ```
 
-See `TESTING.md` for mounting source and advanced usage.
+See `docs/TESTING.md` for mounting source and advanced usage.
 
 ### Converter & Progress Utilities
 

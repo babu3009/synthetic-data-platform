@@ -314,11 +314,11 @@ jobs:
         working-directory: ./apps/backend
         run: poetry install --no-interaction
 
-      - name: Spin up infrastructure (docker-compose)
+      - name: Spin up infrastructure (docker compose)
         working-directory: ./infra
         run: |
-          docker-compose up -d
-          docker-compose ps
+          docker compose up -d
+          docker compose ps
 
       - name: Wait for services health
         run: |
@@ -334,4 +334,4 @@ jobs:
       - name: Tear down infrastructure
         if: always()
         working-directory: ./infra
-        run: docker-compose down -v
+        run: docker compose down -v

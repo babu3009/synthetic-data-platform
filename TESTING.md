@@ -1,12 +1,10 @@
-# Testing Guide
+﻿# Testing Guide (Relocated)
 
-This document describes how to run the test suites for the Synthetic Data Platform.
+The unified testing guide now lives at `docs/TESTING.md`.
 
-## Overview
+Please refer to that file for current instructions on running backend, frontend, coverage, flakiness detection, and troubleshooting.
 
-The repository contains two main test areas:
-- **Backend (FastAPI / Python / pytest)** located under `apps/backend/tests`.
-- **Frontend (React / Vite / Vitest)** located under `apps/frontend/src/tests`.
+This legacy file is retained as a pointer to avoid broken references.
 
 ## Backend Testing
 

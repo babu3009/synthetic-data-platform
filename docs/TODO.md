@@ -1,15 +1,59 @@
-# Project TODOs
+# Project TODOs (Authoritative)
 
-> Note: The root-level `TODO.md` is now the single source of truth for open work. This file remains for historical context; please update the root `TODO.md` when adding or completing tasks.
+> This file is now the single source of truth for all project tasks. The previous root `TODO.md` has been replaced with a pointer here.
+> Each task includes scope tags to clarify whether it affects the **backend**, **frontend**, or **both**, along with any extra domains like **ci**, **docs**, **test**, **infra**.
 
-This document captures planned enhancements, grouped by area, to pick up after the current instructions are complete.
+Legend for tags:
+`[frontend]` UI/React/Vite work  |  `[backend]` FastAPI/Python work  | `[both]` cross-cutting  | `[ci]` pipelines & automation  | `[docs]` documentation  | `[test]` testing/quality  | `[infra]` infrastructure
 
-## Frontend
+---
+
+## Open / In Progress
+
+- [ ] [frontend][ci][P0] Align frontend CI coverage provider with Vitest v1 (already implemented; validate & mark done after next CI run)
+  - Path: `.github/workflows/ci.yml`
+  - Description: Ensure CI uses config-driven `v8` provider (removed legacy `--coverage.provider=c8`). Confirm Codecov upload unaffected.
+  - Acceptance:
+    - CI run shows coverage from v8 without error.
+    - `vitest-report.json` still generated for flakiness script.
+
+- [ ] [frontend][test][P2] Replace deprecated ReactDOMTestUtils.act usage in tests
+  - Paths: `apps/frontend/src/tests/**`
+  - Description: Remove/avoid deprecated ReactDOMTestUtils.act warnings by upgrading Testing Library and relying on async utilities (`findBy*`, `waitFor`).
+  - Acceptance:
+    - No act deprecation warnings in Vitest output.
+    - All existing tests pass unchanged logically.
+
+- [ ] [both][docs][P2] Consolidate old scattered TODO references in code comments
+  - Paths: `apps/**`, `infra/**`
+  - Description: Search for inline `TODO:` comments that duplicate items now tracked here; convert critical ones into tasks or mark as resolved.
+  - Acceptance:
+    - No orphan critical TODO comments remain without representation here.
+    - Added tasks for any newly discovered high-impact TODOs.
+
+---
+
+## Backlog (Triaged)
+
+- [ ] [frontend][ci][P2] Historical flakiness trend tracking
+  - Paths: `.github/workflows/ci.yml`, `apps/frontend/scripts/flakiness-trend.ts` (new)
+  - Description: Persist prior Vitest JSON summaries to surface regressions (store as build artifact or lightweight gist/repo artifacts).
+  - Acceptance:
+    - Optional job publishes trend summary table.
+    - Disabled for PR by default.
+
+---
+
+## Feature & Area Roadmap
+
+### Frontend
+
+#### Wizard & Core UI
 
 - [x] ERD diagram UI
   - Replace Diagram tab placeholder with an interactive ERD: render tables and PK/FK edges, pan/zoom, auto-layout, and drag for manual positioning. Persist layout per entity.
-- [ ] Per-project wizard routing
-  - Change Wizard route to `/wizard/:projectId` instead of query param. Update links and load entities by route param.
+- [x] [frontend][routing][P1] Per-project wizard routing
+  - Implemented `/projects/:projectId/wizard` plus legacy redirect.
 - [ ] Dev auth headers toggle
   - In `services/sources.ts`, add an optional dev-mode toggle to send `X-User-Sub` or `X-API-Key` headers for local testing. Make configurable via env or local storage.
 - [ ] Wizard state unit tests
@@ -40,8 +84,8 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Once backend entities endpoints exist, add a typed client for CRUD and wire listing, creation, updates, and deletion.
 - [ ] Wizard docs and screenshots
   - Document Wizard usage (DDL/JSON/Fields), include screenshots/gifs, and add troubleshooting notes to the frontend README.
-- [ ] CI: frontend pipeline
-  - Add CI to lint, type-check, build, and run tests for the frontend. Cache node_modules for speed; report coverage.
+- [x] [frontend][ci][P1] CI: frontend pipeline
+  - Lint, type-check, build, test, coverage & flakiness heuristic integrated.
 
 ### Admin → LLM & Project LLM Settings
 
@@ -51,8 +95,8 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Providers CRUD, credentials upsert, models list/create, probe, and discover-models.
 - [x] File naming policy
   - Converted component files to snake_case; PascalCase re-export stubs remain for now.
-- [ ] Remove PascalCase re-export stubs
-  - Physically delete `ProviderFormModal.tsx`, `CredentialsModal.tsx`, `DiscoverDrawer.tsx` when safe (Windows case-collision handled).
+- [ ] [frontend][refactor][P2] Remove PascalCase re-export stubs
+  - Delete legacy PascalCase wrapper re-exports once confirmed not referenced externally.
 - [x] Project → LLM Settings page (OWNER/EDITOR editable)
   - Enable toggle, provider and model selects (filtered to enabled), advanced tuning (temperature/top_p/max_tokens), guardrails (PII block, tool use), Test Suggestion panel.
 - [ ] Manual smoke test
@@ -73,13 +117,13 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [x] Assert audit in rate limit tests
   - Extend test to verify `llm.infer.rate_limited` audit row insertion.
 
-- [ ] Rules tab persistence
+- [ ] [frontend][backend][data][P1] Rules tab persistence
   - Persist Rules per entity (localStorage + backend endpoints). Prefer backend when available; define typed schema.
-- [ ] Rules & Providers tests
+- [ ] [frontend][test][P1] Rules & Providers tests
   - Add unit/integration tests for Providers & PII grid (edits, auto-suggest, save) and Rules editor (YAML/JSON sync, lints, dry-run validate).
-- [ ] Wizard quick-start docs
+- [ ] [frontend][docs][P2] Wizard quick-start docs
   - Add a brief quick-start to the frontend README for the Wizard (Entities, Diagram, Providers & PII, Rules), with screenshots/GIFs.
-- [ ] Fast-refresh cleanup
+- [ ] [frontend][perf][P2] Fast-refresh cleanup
   - Extract navbar to `components/navbar.tsx`, reintroduce `app.tsx`, and remove no-op placeholders to clear Vite fast-refresh warning.
 
 ### Outputs & Run
@@ -91,20 +135,20 @@ This document captures planned enhancements, grouped by area, to pick up after t
 
 ## Backend
 
-- [ ] Persist entities server-side
+- [ ] [backend][api][P1] Persist entities server-side
   - Add backend endpoints to create/read/update/delete EntitySchemas. Save Wizard-created entities to the database; fetch on Wizard load; ensure name uniqueness per project enforced server-side.
-- [ ] More SQL dialect support
+- [ ] [backend][ddl][P2] More SQL dialect support
   - Extend DDL parsing dialect options (e.g., MSSQL, Oracle) and optionally auto-detect dialect from content.
-- [ ] Backend create-from-canonical
+- [ ] [backend][api][P2] Backend create-from-canonical
   - Add a dedicated backend endpoint to accept canonical schema JSON and create an EntitySchema atomically. Return created entity with ID.
-- [ ] Entities import/export endpoints
+- [ ] [backend][api][P2] Entities import/export endpoints
   - Implement endpoints to export an EntitySchema to JSON and to import canonical JSON into a persisted EntitySchema. Handle validation and deduplication.
-- [ ] Telemetry ingestion and storage
+- [ ] [backend][telemetry][P2] Telemetry ingestion and storage
   - Add backend endpoints or logging to accept telemetry events from the frontend and store/aggregate them for UX analysis.
 
 ### LLM Client & Adapters
 
-- [ ] Integration tests
+- [ ] [backend][test][P1] Integration tests (LLM credential & factory)
   - Add tests that decrypt credentials and exercise factory with mocked HTTP across adapters; include negative cases (disabled provider, bad key).
 - [x] Model discovery endpoints
   - Implemented real `:discover-models` for OpenAI, Anthropic, Ollama, LM Studio with per-provider parsing, upsert, diff summary, and audit logging.
@@ -115,27 +159,27 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Wired LLM gating via `ProjectLLMSetting` + `LLMClientFactory`; if disabled or misconfigured, heuristic-only path is used.
   - Updated and added tests: adjusted existing infer tests and added `tests/api/test_infer_providers_llm.py` mocking adapters across provider kinds; verified disabled behavior.
   - Test run green for infer/providers and existing suites.
-- [ ] Scoring logic upgrade
+- [ ] [backend][llm][P2] Scoring logic upgrade
   - Replace heuristic `suggest_providers` ranking with prompt- or rule-based scoring that considers data types, PII tags, and context window. Add tunables.
-- [ ] Local-first preference toggle
+- [ ] [backend][llm][P2] Local-first preference toggle
   - Add config to prefer local adapters (Ollama/LM Studio) when reachable; otherwise fall back to remote providers.
-- [ ] Multi-credential selection
+- [ ] [backend][llm][P2] Multi-credential selection
   - Support multiple credentials per provider and selection policy (by project, by tag/region, round-robin).
-- [ ] Caching and rate-limit guards
+- [ ] [backend][llm][perf][P2] Caching and rate-limit guards
   - Cache probe/model lists per provider and respect provider-specific rate limits. Add circuit-breaker behavior on repeated failures.
-- [ ] Integration tests
+- [ ] [backend][test][P1] Credential & failure path tests (duplicate entry consolidated)
   - Add tests that decrypt credentials and exercise factory with mocked HTTP across adapters; include negative cases (disabled provider, bad key).
   
 #### New Follow-ups (Post Discovery Implementation)
-- [ ] Discovery tests (Anthropic & LM Studio)
+- [ ] [backend][test][P1] Discovery tests (Anthropic & LM Studio)
   - Add unit tests mirroring OpenAI/Ollama coverage for Anthropic and LM Studio discovery parsing and diff counters.
-- [ ] Error taxonomy & logging
+- [ ] [backend][error][P2] Error taxonomy & logging (dedupe consolidated)
   - Standardize exceptions for network, auth, rate-limit, and schema parsing; surface structured error codes in probe/discover responses.
 - [ ] Error taxonomy & logging
   - Standardize exceptions for network, auth, rate-limit, and schema parsing; surface structured error codes in probe/discover responses.
-- [ ] Default model policy
+- [ ] [backend][llm][P2] Default model policy
   - Add periodic task or admin action to re-evaluate `is_default` per provider when context windows or recommended base models change.
-- [ ] Caching layer
+- [ ] [backend][llm][perf][P2] Caching layer (dedupe with guards; consider unifying)
   - Cache raw discovery payloads (short TTL) to reduce repeated external calls when multiple admins trigger discovery.
 
 #### Testing Additions
@@ -143,23 +187,23 @@ This document captures planned enhancements, grouped by area, to pick up after t
   - Added test covering missing `provider_id` and mismatched provider/model (422) and valid pairing (200).
 - [x] Rate limit tests
   - Added test confirming 60 successful inference calls then 429 on exceed within same minute window.
-- [ ] Docs expansion
+- [ ] [backend][docs][P2] LLM docs expansion (QUICK_REFERENCE additions)
   - Extend QUICK_REFERENCE and ENVIRONMENT docs with discovery usage examples (curl), default assignment rules, and troubleshooting (e.g., missing API key).
 
-- [ ] Providers save endpoint
+- [ ] [backend][api][P1] Providers save endpoint
   - Implement/confirm `PUT /api/v1/projects/{project_id}/entities/{entity_id}/providers` and align with frontend contract.
-- [ ] Validate endpoint
+- [ ] [backend][api][P1] Validate endpoint
   - Ensure `/api/v1/validate` exists and returns compact ValidationReport matching frontend contract; add tests.
-- [ ] Lifespan migration
+- [x] [backend][infra][P1] Lifespan migration (completed)
   - Replace `@app.on_event` startup/shutdown with lifespan context manager and adjust tests/DI accordingly.
-- [ ] Pydantic shadowing fix
+- [x] [backend][api][P1] Pydantic shadowing fix (SchemaResponse aliasing)
   - Resolve SchemaResponse field shadowing warnings and add a regression test.
 
 ### Requests lifecycle
 
 - [x] Implement estimate route
   - `POST /api/v1/projects/{project_id}/requests/{request_id}:estimate` returns `{rows,size_bytes,seconds}` (fields optional by engine).
-- [ ] Implement start route
+- [ ] [backend][api][P1] Implement start route
   - `POST /api/v1/requests/{request_id}:start` transitions status from `pending` to `running` and enqueues processing.
 
 ### Documentation
@@ -167,55 +211,59 @@ This document captures planned enhancements, grouped by area, to pick up after t
 - [x] Add curl examples for Providers, Validate, and Requests lifecycle
   - Update backend docs with examples for infer/save providers, validate, create/estimate/start requests, status, and artifacts.
 
-- [ ] Outputs documentation (DB/Kafka)
+- [ ] [backend][docs][P1] Outputs documentation (DB/Kafka)
   - Create `apps/backend/docs/OUTPUTS.md` with configuration and curl examples; add links from root README and backend docs.
 
 ---
 
 This list mirrors the in-editor task tracker and can be maintained alongside code reviews and milestones.
 
-## ✅ Done
+## ✅ Done (Highlights)
 
-- [x] Add navbar link to LLM Settings and LLM Providers (project-scoped when URL contains projectId)
+- [x] [frontend][routing] Add navbar link to LLM Settings and LLM Providers (project-scoped)
   - Commit: a697cc3a
   - Added links in `src/main.tsx` with auto-detected projectId from path; includes fallbacks when absent.
-- [x] LLM Settings page tests (base)
+- [x] [frontend][test] LLM Settings page tests (base)
   - Commit: a697cc3a
   - Added tests for role gating (VIEWER disables), model filtering per provider, Test Suggestion panel wiring, and Save submission payload.
-- [x] Tracing & rate-limit docs
+- [x] [backend][docs] Tracing & rate-limit docs
   - Commit: a697cc3a
   - Created `TRACING_RATE_LIMIT.md`, linked from backend docs and root, and referenced settings/env toggles.
-- [x] Connectivity probes (real) and probe endpoint real call
+- [x] [backend][llm] Connectivity probes (real) and probe endpoint
   - Commit: a697cc3a
   - Implemented provider-specific lightweight probes (OpenAI/Anthropic/Ollama/LM Studio) with timeout, latency_ms in audit, and error classification.
-- [x] Fix discover-models provider_id NOT NULL bug
+- [x] [backend][llm] Fix discover-models provider_id NOT NULL bug
   - Commit: a697cc3a
   - Ensure models and credentials are created with provider_id set pre-commit; adjusted tests accordingly.
 
 ## Recently Completed
 
-- [x] Autosave & dirty-nav guard
+- [x] [frontend][ux] Autosave & dirty-nav guard
   - Added 800ms autosave for Diagram and Providers tabs, tracked dirty flag, and warned on navigating away with unsaved changes.
-- [x] Draft mode for entities
+- [x] [frontend][ux] Draft mode for entities
   - Autosaved partial entities per project and rehydrated them on load so users can leave and return later.
- - [x] Accessibility (A11y) improvements
+ - [x] [frontend][a11y] Accessibility (A11y) improvements
    - Added keyboard navigation for diagram node lists (Space/Enter toggles PK, E opens editor, Arrow keys navigate) and Providers grid (Alt+ArrowUp/Down to move vertically). Added aria-labels and visible focus outlines aligned with Bootstrap.
- - [x] Tooltips and inline help
+ - [x] [frontend][ux] Tooltips and inline help
    - Added contextual tooltips for PK/FK indicators, row targets (absolute/ratioTo), distribution field help, and Providers grid headers (Provider, Config, PII).
- - [x] Dark mode compatibility
+ - [x] [frontend][ux] Dark mode compatibility
    - Implemented prefers-color-scheme dark styles and Bootstrap-friendly focus rings without introducing a new CSS framework.
- - [x] Performance optimizations
+ - [x] [frontend][perf] Performance optimizations
    - Windowed long column lists in diagram table nodes (paged view) and lazy-loaded the Column Editor modal to reduce initial bundle size.
 
-  - [x] Postgres upsert writer (backend)
+  - [x] [backend][outputs] Postgres upsert writer
     - Batched `INSERT ... ON CONFLICT DO UPDATE` with single-transaction safety; configurable `table_map`, `conflict_columns_map`, and `batch_size`.
-  - [x] Kafka event writer (backend)
+  - [x] [backend][outputs] Kafka event writer
     - JSON publishing with optional `key_field`, headers, and producer tuning; optional `include_table_name` flag.
-  - [x] Outputs wiring for generators/jobs
+  - [x] [backend][outputs] Outputs wiring for generators/jobs
     - Relational and flat generators write to file artifacts and optionally DB/Kafka; jobs pass `params_json.outputs.*` configs.
-  - [x] Estimate endpoint
+  - [x] [backend][api] Estimate endpoint
     - `POST /api/v1/projects/{project_id}/requests/{id}:estimate` implemented with heuristic estimator service.
-  - [x] E2E MinIO upload test
+  - [x] [backend][test] E2E MinIO upload test
     - Generates large relational datasets and uploads CSV/Parquet to MinIO; skips gracefully when MinIO isn’t configured.
-  - [x] README updates
+  - [x] [docs] README updates (Outputs & estimate)
+
+---
+
+> For full historical task completion (older entries) refer to repository commit history or prior versions of this file before consolidation.
     - Root README documents Outputs (files/DB/Kafka) and estimate endpoint; cross-links to backend docs.

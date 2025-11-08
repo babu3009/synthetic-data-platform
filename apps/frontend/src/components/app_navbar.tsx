@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Navbar as BsNavbar, Nav, Container } from 'react-bootstrap'
 import ProjectSelectorModal from './project_selector'
 
@@ -13,7 +13,7 @@ function AppNavbar() {
   const llmProvidersHref = projectId ? `/admin/${projectId}/llm-providers` : '/admin/llm-providers'
   const [showPicker, setShowPicker] = React.useState(false)
   const [pendingAction, setPendingAction] = React.useState<'settings' | 'providers' | 'wizard' | null>(null)
-  const navigate = (to: string) => { window.history.pushState({}, '', to); window.dispatchEvent(new PopStateEvent('popstate')) }
+  const navigate = useNavigate()
 
   function handleNavigate(target: 'settings' | 'providers' | 'wizard') {
     if (projectId) {

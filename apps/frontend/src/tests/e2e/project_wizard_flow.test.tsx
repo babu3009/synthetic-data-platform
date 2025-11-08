@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppNavbar from '../../components/app_navbar'
 import WizardPage from '../../pages/wizard_page'
@@ -19,14 +19,30 @@ vi.mock('../../hooks/use_projects', () => {
   }
 })
 
+function RouteShell() {
+  // Helper component to expose current path for assertions if needed
+  const loc = useLocation()
+  return (
+    <>
+      <AppNavbar />
+      <WizardPage />
+      <div data-testid="current-path" hidden>{loc.pathname}</div>
+    </>
+  )
+}
+
 function setup(initialPath = '/') {
   const qc = new QueryClient()
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialPath]}>
-        {/* Render navbar and wizard routes */}
-        <AppNavbar />
-        <WizardPage />
+        <Routes>
+          <Route path="/" element={<RouteShell />} />
+          <Route path="/wizard" element={<RouteShell />} />
+          <Route path="/projects/:projectId/wizard" element={<RouteShell />} />
+          <Route path="/projects/:projectId/llm-settings" element={<RouteShell />} />
+          <Route path="/admin/:projectId/llm-providers" element={<RouteShell />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>
   )
@@ -49,9 +65,11 @@ describe('Project selection → wizard flow', () => {
     const goBtn = screen.getByRole('button', { name: /Go/i })
     fireEvent.click(goBtn)
 
-    // Wait for wizard page to show Entities with Project: projB
+    // Wait for wizard page to set projectId and surface in Entities page
     await waitFor(() => {
-      expect(screen.getByText(/Project:\s*projB/i)).toBeInTheDocument()
+      const projectLabel = screen.getByText(/Project:\s*projB/i)
+      expect(projectLabel).toBeInTheDocument()
+      expect(screen.getByTestId('current-path').textContent).toMatch(/\/projects\/projB\/wizard$/)
     })
 
     // Tabs should be present

@@ -28,7 +28,8 @@ if (rootEl) {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        {/* Opt-in to React Router v7 future flags for smoother upgrade path */}
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AppNavbar />
           <main className="container-fluid px-0">
             <Routes>

@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",
-    "coverage": "vitest --coverage"
+    "coverage": "vitest run --coverage --reporter=dot"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.8.4",
@@ -41,9 +41,9 @@
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
-    "@vitejs/plugin-react": "^4.1.1",
-    "@vitest/coverage-v8": "^4.0.8",
-    "@vitest/ui": "^0.34.6",
+  "@vitejs/plugin-react": "^4.1.1",
+  "@vitest/coverage-v8": "^1.6.0",
+  "@vitest/ui": "^1.6.0",
     "c8": "^8.0.1",
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -52,7 +52,7 @@
     "msw": "^1.2.1",
     "prettier": "^3.1.0",
     "typescript": "^5.2.2",
-    "vite": "^4.5.0",
-    "vitest": "^0.34.6"
+    "vite": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }
