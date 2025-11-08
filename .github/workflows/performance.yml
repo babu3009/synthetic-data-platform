@@ -1,0 +1,69 @@
+name: Performance Placeholder
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'  # daily at 04:00 UTC
+
+jobs:
+  perf-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run placeholder performance script
+        working-directory: ./infra/perf
+        run: node performance-placeholder.js
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: infra/perf/performance-results.json
+
+      - name: Append performance summary
+        run: |
+          echo "## Performance placeholder" >> $GITHUB_STEP_SUMMARY
+          echo "Artifact: performance-results.json (simulated metrics)" >> $GITHUB_STEP_SUMMARY
+      - name: Enforce performance thresholds
+        id: perf_gate
+        shell: bash
+        env:
+          PERF_P95_MAX_MS: "120" # adjust threshold as needed
+          PERF_P99_MAX_MS: "160" # adjust threshold as needed
+        run: |
+          set -e
+          FILE="infra/perf/performance-results.json"
+          if [ ! -f "$FILE" ]; then
+            echo "Performance results file missing: $FILE" >> $GITHUB_STEP_SUMMARY
+            echo "status=missing" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          P95=$(jq '[.metrics[].p95_ms] | max' "$FILE")
+          P99=$(jq '[.metrics[].p99_ms] | max' "$FILE")
+          echo "Max P95: $P95 ms" >> $GITHUB_STEP_SUMMARY
+          echo "Max P99: $P99 ms" >> $GITHUB_STEP_SUMMARY
+          FAIL=0
+          if [ "$(printf '%.0f' "$P95")" -gt "$PERF_P95_MAX_MS" ]; then
+            echo "❌ P95 exceeds threshold ($P95 > $PERF_P95_MAX_MS)" >> $GITHUB_STEP_SUMMARY
+            FAIL=1
+          else
+            echo "✅ P95 within threshold ($P95 <= $PERF_P95_MAX_MS)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$(printf '%.0f' "$P99")" -gt "$PERF_P99_MAX_MS" ]; then
+            echo "❌ P99 exceeds threshold ($P99 > $PERF_P99_MAX_MS)" >> $GITHUB_STEP_SUMMARY
+            FAIL=1
+          else
+            echo "✅ P99 within threshold ($P99 <= $PERF_P99_MAX_MS)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ $FAIL -eq 1 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          echo "status=passed" >> $GITHUB_OUTPUT

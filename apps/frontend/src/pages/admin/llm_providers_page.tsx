@@ -30,7 +30,6 @@ export default function LlmProvidersPage() {
   React.useEffect(() => {
     if (!projectId) {
       // Navigate to home if no project context; in a real app, pick from selector
-      // eslint-disable-next-line no-console
       console.warn('Missing projectId; append ?projectId=<uuid> to URL to scope admin APIs')
     }
   }, [projectId])

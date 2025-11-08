@@ -19,7 +19,8 @@ export type RuleResult = {
 
 export type ValidationReport = { sample: RuleResult[]; final: RuleResult[] }
 
-export async function validateRules(body: any) {
+// Accept unknown payload; caller is responsible for supplying a shape the backend understands.
+export async function validateRules(body: unknown) {
   const res = await api.post('/api/v1/validate', body)
   return res.data as { rules?: Rule[]; report?: ValidationReport }
 }

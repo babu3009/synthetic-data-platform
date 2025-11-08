@@ -1,0 +1,92 @@
+name: Coverage Trend (Scheduled)
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # daily at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  collect-trend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Frontend - Set up Node.js 18 and pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Frontend deps
+        working-directory: ./apps/frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Run frontend coverage (no build)
+        working-directory: ./apps/frontend
+        run: pnpm coverage:ci
+
+      - name: Backend - Set up Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Backend deps
+        working-directory: ./apps/backend
+        run: |
+          poetry install --no-interaction --no-root
+          poetry install --no-interaction
+
+      - name: Run backend coverage
+        working-directory: ./apps/backend
+        run: poetry run pytest -m "not e2e" --cov=app --cov-report=xml --cov-fail-under=0
+
+      - name: Compose coverage trend object
+        id: compose
+        shell: bash
+        run: |
+          python3 - << 'PY'
+          import json, xml.etree.ElementTree as ET
+          import pathlib
+          # frontend
+          fsum = json.load(open('apps/frontend/coverage/coverage-summary.json','r'))
+          ftot = fsum.get('total',{})
+          fe = {k: ftot.get(k,{}).get('pct') for k in ['lines','statements','functions','branches']}
+          # backend
+          root = ET.parse('apps/backend/coverage.xml').getroot()
+          be = {
+            'lines': float(root.attrib.get('line-rate', 0)) * 100,
+            'branches': float(root.attrib.get('branch-rate', 0)) * 100,
+          }
+          trend = {
+            'timestamp': __import__('datetime').datetime.utcnow().isoformat() + 'Z',
+            'frontend': fe,
+            'backend': be,
+          }
+          pathlib.Path('trend').mkdir(exist_ok=True)
+          with open('trend/coverage-trend.json','w') as f:
+            json.dump(trend, f, indent=2)
+          print('done')
+          PY
+
+      - name: Upload coverage trend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-trend
+          path: trend/coverage-trend.json
+
+      - name: Append coverage trend summary
+        run: |
+          echo "## Daily coverage trend (latest run)" >> $GITHUB_STEP_SUMMARY
+          echo "Artifact: coverage-trend.json" >> $GITHUB_STEP_SUMMARY

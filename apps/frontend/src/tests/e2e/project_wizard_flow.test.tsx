@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { act } from 'react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppNavbar from '../../components/app_navbar'
@@ -35,7 +37,8 @@ function setup(initialPath = '/') {
   const qc = new QueryClient()
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[initialPath]}>
+  {/* Remove future flags which invoke startTransition leading to act warnings */}
+  <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/" element={<RouteShell />} />
           <Route path="/wizard" element={<RouteShell />} />
@@ -51,19 +54,20 @@ function setup(initialPath = '/') {
 describe('Project selection → wizard flow', () => {
   it('opens project selector then navigates to wizard with projectId and renders Entities tab', async () => {
     setup('/')
+    const user = userEvent.setup()
 
     // Click Data Wizard without project in route → should open modal
     const wizardLink = await screen.findByRole('link', { name: /Data Wizard/i })
-    fireEvent.click(wizardLink)
+  await act(async () => { await user.click(wizardLink) })
 
     expect(await screen.findByText(/Select a project/i)).toBeInTheDocument()
 
     // Choose a project
-    const select = screen.getByLabelText(/Project select/i) as HTMLSelectElement
-    fireEvent.change(select, { target: { value: 'projB' } })
+  const select = screen.getByLabelText(/Project select/i) as HTMLSelectElement
+  await act(async () => { await user.selectOptions(select, 'projB') })
 
-    const goBtn = screen.getByRole('button', { name: /Go/i })
-    fireEvent.click(goBtn)
+  const goBtn = screen.getByRole('button', { name: /Go/i })
+  await act(async () => { await user.click(goBtn) })
 
     // Wait for wizard page to set projectId and surface in Entities page
     await waitFor(() => {

@@ -17,7 +17,7 @@ export default function ProjectSelectorModal({ show, onClose, onSelect }: Props)
   }, [data, selected])
 
   return (
-    <Modal show={show} onHide={onClose} backdrop="static" centered>
+  <Modal show={show} onHide={onClose} backdrop="static" centered animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Select a project</Modal.Title>
       </Modal.Header>

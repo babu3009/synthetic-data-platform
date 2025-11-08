@@ -202,7 +202,7 @@ const WizardContext = createContext<{
   dispatch: React.Dispatch<Action>
 } | null>(null)
 
-export function WizardProvider({ children, initialProjectId }: { children: React.ReactNode; initialProjectId?: string }) {
+function WizardProviderImpl({ children, initialProjectId }: { children: React.ReactNode; initialProjectId?: string }) {
   const [state, dispatch] = useReducer(reducer, {
     projectId: initialProjectId,
     entities: [],
@@ -241,13 +241,18 @@ export function WizardProvider({ children, initialProjectId }: { children: React
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Hook export is intentional for consumers
 export function useWizard() {
   const ctx = useContext(WizardContext)
   if (!ctx) throw new Error('useWizard must be used within WizardProvider')
   return ctx
 }
 
+// Export component separately to satisfy react-refresh/only-export-components rule
+export const WizardProvider = WizardProviderImpl
+
 // Helpers to validate uniqueness
+// eslint-disable-next-line react-refresh/only-export-components -- Pure helper function; safe to export
 export function isEntityNameUnique(name: string, entities: EntitySchema[]) {
   return !entities.some((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase())
 }
@@ -256,6 +261,7 @@ export function isEntityNameUnique(name: string, entities: EntitySchema[]) {
 type CanonicalColumn = { name: string; dtype: string; nullable: boolean }
 type CanonicalTable = { name: string; columns?: CanonicalColumn[]; pk?: string[]; uniques?: string[][] }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Utility mapping function needed externally
 export function tablesFromCanonicalSchema(schema: { tables: CanonicalTable[] }): Table[] {
   const tables = (schema?.tables ?? []).map((t) => ({
     name: String(t.name),

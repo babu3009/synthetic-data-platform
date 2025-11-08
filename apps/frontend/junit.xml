@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="vitest" tests="11" failures="0" time="0">
+    <testcase classname="src/tests/app.test.tsx" name=" App renders without crashing" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page disables editing for VIEWER role" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page lists only enabled providers and models for selected provider" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page opens Test Suggestions panel on click" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page submits and calls save with current settings" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page updates and saves advanced params (temperature, top_p, max_tokens)" time="0" />
+    <testcase classname="src/tests/llm_settings_page.test.tsx" name=" LLM Settings Page toggles and saves guardrails switches (block_pii, allow_tool_use)" time="0" />
+    <testcase classname="src/tests/navbar_project_selector.test.tsx" name=" Navbar project selector opens selector when LLM Settings clicked without projectId and navigates after selection" time="0" />
+    <testcase classname="src/tests/wizard_routing.test.tsx" name=" Wizard routing sets projectId from route param" time="0" />
+    <testcase classname="src/tests/wizard_routing.test.tsx" name=" Wizard routing redirects legacy /wizard?projectId=... to /projects/:projectId/wizard" time="0" />
+    <testcase classname="src/tests/e2e/project_wizard_flow.test.tsx" name=" Project selection → wizard flow opens project selector then navigates to wizard with projectId and renders Entities tab" time="0" />
+  </testsuite>
+</testsuites>

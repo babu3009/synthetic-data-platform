@@ -1,0 +1,85 @@
+name: Test Duration Trend
+
+on:
+  schedule:
+    - cron: '15 2 * * *' # daily at 02:15 UTC
+  workflow_dispatch:
+
+jobs:
+  collect-test-durations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Frontend: produce vitest-report.json
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install frontend dependencies
+        working-directory: ./apps/frontend
+        run: pnpm install
+
+      - name: Run Vitest JSON reporter (frontend)
+        working-directory: ./apps/frontend
+        run: pnpm coverage:ci
+
+      # Backend: produce pytest-junit.xml
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install backend dependencies
+        working-directory: ./apps/backend
+        run: |
+          poetry install --no-interaction --no-root
+          poetry install --no-interaction
+
+      - name: Run Pytest JUnit (backend, unit/integration only)
+        working-directory: ./apps/backend
+        run: poetry run pytest -m "not e2e" --junitxml=pytest-junit.xml -q
+
+      # Aggregate durations
+      - name: Set up Node for scripts
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Aggregate test durations
+        run: node scripts/aggregate-test-durations.mjs --vitest apps/frontend/vitest-report.json --pytest apps/backend/pytest-junit.xml
+
+      - name: Prepare trend snapshots
+        shell: bash
+        run: |
+          mkdir -p trend
+          TS=$(date -u +"%Y%m%dT%H%M%SZ")
+          cp test-duration-trend.json "trend/test-duration-${TS}.json"
+          cp test-duration-trend.md "trend/test-duration-${TS}.md"
+          cp test-duration-trend.json trend/test-duration-latest.json
+          cp test-duration-trend.md trend/test-duration-latest.md
+
+      - name: Upload trend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-duration-trend
+          path: trend
+
+      - name: Append test duration summary
+        run: |
+          echo "## Test Duration Trend (snapshot)" >> $GITHUB_STEP_SUMMARY
+          cat test-duration-trend.md >> $GITHUB_STEP_SUMMARY

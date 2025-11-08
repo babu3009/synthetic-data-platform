@@ -1,0 +1,110 @@
+name: Container Image Size Trend
+
+on:
+  schedule:
+    - cron: '15 3 * * *' # daily at 03:15 UTC
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  size-trend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Inspect latest image sizes
+        shell: bash
+        run: |
+          set -e
+          export BACKEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
+          export FRONTEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
+          docker buildx imagetools inspect --format '{{json .}}' "$BACKEND_REF" > backend-imagetools.json || echo '{}' > backend-imagetools.json
+          docker buildx imagetools inspect --format '{{json .}}' "$FRONTEND_REF" > frontend-imagetools.json || echo '{}' > frontend-imagetools.json
+          python3 <<'PY'
+          import json, datetime, os, pathlib
+          def read_json(path):
+              try:
+                  with open(path, 'r', encoding='utf-8') as f:
+                      return json.load(f)
+              except Exception:
+                  return {}
+          def parse_size(obj):
+              try:
+                  mans = obj.get('manifests') or []
+                  if mans:
+                      sz = mans[0].get('size')
+                      if isinstance(sz, int):
+                          return sz
+              except Exception:
+                  pass
+              try:
+                  layers = obj.get('manifest', {}).get('layers', [])
+                  s = sum(int(l.get('size') or 0) for l in layers)
+                  if s:
+                      return s
+              except Exception:
+                  pass
+              return 0
+          def human(n):
+              n = float(n)
+              for unit in ['B','KB','MB','GB','TB']:
+                  if n < 1024 or unit == 'TB':
+                      return f"{n:.1f} {unit}"
+                  n /= 1024
+          backend_ref = os.environ['BACKEND_REF']
+          frontend_ref = os.environ['FRONTEND_REF']
+          backend_obj = read_json('backend-imagetools.json')
+          frontend_obj = read_json('frontend-imagetools.json')
+          bsize = parse_size(backend_obj)
+          fsize = parse_size(frontend_obj)
+          out = {
+              'generatedAt': datetime.datetime.utcnow().isoformat()+'Z',
+              'backend': {'ref': backend_ref, 'sizeBytes': bsize, 'sizeHuman': human(bsize)},
+              'frontend': {'ref': frontend_ref, 'sizeBytes': fsize, 'sizeHuman': human(fsize)}
+          }
+          pathlib.Path('image-sizes.json').write_text(json.dumps(out, indent=2), encoding='utf-8')
+          pathlib.Path('image-sizes.md').write_text('# Container Image Sizes\n\n'
+              + f"Generated: {out['generatedAt']}\n\n"
+              + f"- Backend ({out['backend']['ref']}): {out['backend']['sizeHuman']} ({out['backend']['sizeBytes']} bytes)\n"
+              + f"- Frontend ({out['frontend']['ref']}): {out['frontend']['sizeHuman']} ({out['frontend']['sizeBytes']} bytes)\n"
+          , encoding='utf-8')
+          PY
+
+      - name: Prepare trend snapshots
+        shell: bash
+        run: |
+          mkdir -p trend
+          TS=$(date -u +"%Y%m%dT%H%M%SZ")
+          cp image-sizes.json "trend/image-sizes-${TS}.json"
+          cp image-sizes.md "trend/image-sizes-${TS}.md"
+          cp image-sizes.json trend/image-sizes-latest.json
+          cp image-sizes.md trend/image-sizes-latest.md
+
+      - name: Upload image size trend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-size-trend
+          path: trend
+
+      - name: Append image size summary
+        run: |
+          echo "## Container Image Size Trend (snapshot)" >> $GITHUB_STEP_SUMMARY
+          cat image-sizes.md >> $GITHUB_STEP_SUMMARY

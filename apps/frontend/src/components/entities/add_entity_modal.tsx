@@ -37,7 +37,15 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     pk: ['id'],
   }])
 
-  const nameUnique = useMemo(() => isEntityNameUnique(name, existingNames.map((n) => ({ name: n } as any) as EntitySchema) as any), [name, existingNames])
+  // Build minimal EntitySchema objects for uniqueness check without any casts
+  const nameUnique = useMemo(
+    () =>
+      isEntityNameUnique(
+        name,
+        existingNames.map((n) => ({ id: `existing-${n}`, name: n, tables: [], updatedAt: '' }))
+      ),
+    [name, existingNames]
+  )
 
   function resetState() {
     setError(null)
@@ -61,6 +69,15 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     }, 200)
   }
 
+  function extractError(e: unknown, fallback: string) {
+    if (typeof e === 'string') return e
+    if (e && typeof e === 'object') {
+      const anyErr = e as { response?: { data?: { detail?: string } }; message?: string }
+      return anyErr?.response?.data?.detail || anyErr?.message || fallback
+    }
+    return fallback
+  }
+
   async function handleParseDDL() {
     setError(null)
     setDdlParsing(true)
@@ -80,8 +97,8 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
       const canonical = await getSourceSchema(projectId, created.id)
       const mapped = tablesFromCanonicalSchema(canonical)
       setDdlTables(mapped)
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || 'Failed to parse DDL')
+    } catch (e: unknown) {
+      setError(extractError(e, 'Failed to parse DDL'))
     } finally {
       setDdlParsing(false)
     }
@@ -103,14 +120,14 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
       const canonical = await getSourceSchema(projectId, created.id)
       const mapped = tablesFromCanonicalSchema(canonical)
       setJsonTables(mapped)
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Fallback: try parsing locally to give feedback
       try {
         const parsed = JSON.parse(jsonText)
         const mapped = tablesFromCanonicalSchema(parsed)
         setJsonTables(mapped)
       } catch (_) {
-        setError(e?.response?.data?.detail || e?.message || 'Invalid JSON schema')
+        setError(extractError(e, 'Invalid JSON schema'))
       }
     } finally {
       setJsonValidating(false)
@@ -179,7 +196,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
   }
 
   return (
-    <Modal show={show} onHide={closeAndReset} size="lg" backdrop="static">
+  <Modal show={show} onHide={closeAndReset} size="lg" backdrop="static" animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Add Entity</Modal.Title>
       </Modal.Header>
@@ -201,7 +218,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
           <Form.Control.Feedback type="invalid">Name must be unique in this project.</Form.Control.Feedback>
         </Form.Group>
 
-        <Tabs activeKey={tab} onSelect={(k) => setTab((k as any) || 'ddl')}>
+  <Tabs activeKey={tab} onSelect={(k) => setTab((k as 'ddl' | 'json' | 'fields') ?? 'ddl')}>
           <Tab eventKey="ddl" title="DDL">
             <div className="pt-3">
               <Row className="mb-2">

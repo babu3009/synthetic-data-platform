@@ -41,7 +41,7 @@ export function CredentialsModal({ projectId, providerId, show, onHide, masked }
   }
 
   return (
-    <Modal show={show} onHide={onHide} backdrop="static" size="lg">
+  <Modal show={show} onHide={onHide} backdrop="static" size="lg" animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Manage Credentials</Modal.Title>
       </Modal.Header>

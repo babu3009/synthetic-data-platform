@@ -16,7 +16,21 @@ synthetic-data-platform/
 
 ## Task Tracker
 
-The unified project task list (backend, frontend, CI, docs) now lives at [`docs/TODO.md`](docs/TODO.md). Each item is labeled with scope tags like `[frontend]`, `[backend]`, or `[both]` plus domains (e.g. `[ci]`, `[docs]`, `[test]`). Use this as the single source of truth for planning and reviews.
+The unified project task list (backend, frontend, CI, docs) now lives at [`TODO.md`](TODO.md) in the repository root and follows the standard template. Use this as the single source of truth for planning and reviews.
+
+### Dependency updates (Renovate)
+
+Automated dependency update PRs are configured via `renovate.json`. Enable the Renovate GitHub App for this repository to start receiving scheduled PRs (grouped by types and with automerge for safe minor/patch updates).
+
+### Image signing & SBOM attestations (optional)
+
+The CI can sign container images using Sigstore Cosign (keyless via GitHub OIDC) and attach SBOM attestations.
+
+- Requirements: no extra secrets required for keyless; ensure the `build-images` job has `id-token: write` permissions (already configured).
+- Outputs: signatures/attestations are published to the registry (ghcr.io) and visible via `cosign verify`.
+- SBOMs are generated with Syft in SPDX JSON and uploaded as build artifacts.
+
+If you prefer key-based signing, set secrets `COSIGN_PRIVATE_KEY`/`COSIGN_PASSWORD` and adjust the CI step to use `--key env:COSIGN_PRIVATE_KEY`.
 
 ## Quick Start
 

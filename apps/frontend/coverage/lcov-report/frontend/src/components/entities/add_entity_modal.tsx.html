@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.12% </span>
+                <span class="strong">64.83% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>226/347</span>
+                <span class='fraction'>236/364</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">9.67% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/30</span>
+                <span class='fraction'>3/31</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.12% </span>
+                <span class="strong">64.83% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>226/347</span>
+                <span class='fraction'>236/364</span>
             </div>
         
             
@@ -410,7 +410,24 @@
 <a name='L345'></a><a href='#L345'>345</a>
 <a name='L346'></a><a href='#L346'>346</a>
 <a name='L347'></a><a href='#L347'>347</a>
-<a name='L348'></a><a href='#L348'>348</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -423,6 +440,14 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
@@ -456,6 +481,15 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -796,7 +830,15 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     pk: ['id'],
   }])
 &nbsp;
-  const nameUnique = useMemo(() =&gt; isEntityNameUnique(name, existingNames.map((n) =&gt; ({ name: n } as any) as EntitySchema) as any), [name, existingNames])
+  // Build minimal EntitySchema objects for uniqueness check without any casts
+  const nameUnique = useMemo(
+    () =&gt;
+      isEntityNameUnique(
+        name,
+        existingNames.map((n) =&gt; ({ id: `existing-${n}`, name: n, tables: [], updatedAt: '' }))
+      ),
+    [name, existingNames]
+  )
 &nbsp;
 <span class="fstat-no" title="function not covered" >  function resetState() {</span>
 <span class="cstat-no" title="statement not covered" >    setError(null)</span>
@@ -820,6 +862,15 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
 <span class="cstat-no" title="statement not covered" >    }, 200)</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
+<span class="fstat-no" title="function not covered" >  function extractError(e: unknown, fallback: string) {</span>
+<span class="cstat-no" title="statement not covered" >    if (typeof e === 'string') return e</span>
+<span class="cstat-no" title="statement not covered" >    if (e &amp;&amp; typeof e === 'object') {</span>
+<span class="cstat-no" title="statement not covered" >      const anyErr = e as { response?: { data?: { detail?: string } }; message?: string }</span>
+<span class="cstat-no" title="statement not covered" >      return anyErr?.response?.data?.detail || anyErr?.message || fallback</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >    return fallback</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+&nbsp;
 <span class="fstat-no" title="function not covered" >  async function handleParseDDL() {</span>
 <span class="cstat-no" title="statement not covered" >    setError(null)</span>
 <span class="cstat-no" title="statement not covered" >    setDdlParsing(true)</span>
@@ -839,8 +890,8 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
 <span class="cstat-no" title="statement not covered" >      const canonical = await getSourceSchema(projectId, created.id)</span>
 <span class="cstat-no" title="statement not covered" >      const mapped = tablesFromCanonicalSchema(canonical)</span>
 <span class="cstat-no" title="statement not covered" >      setDdlTables(mapped)</span>
-<span class="cstat-no" title="statement not covered" >    } catch (e: any) {</span>
-<span class="cstat-no" title="statement not covered" >      setError(e?.response?.data?.detail || e?.message || 'Failed to parse DDL')</span>
+<span class="cstat-no" title="statement not covered" >    } catch (e: unknown) {</span>
+<span class="cstat-no" title="statement not covered" >      setError(extractError(e, 'Failed to parse DDL'))</span>
 <span class="cstat-no" title="statement not covered" >    } finally {</span>
 <span class="cstat-no" title="statement not covered" >      setDdlParsing(false)</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
@@ -862,14 +913,14 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
 <span class="cstat-no" title="statement not covered" >      const canonical = await getSourceSchema(projectId, created.id)</span>
 <span class="cstat-no" title="statement not covered" >      const mapped = tablesFromCanonicalSchema(canonical)</span>
 <span class="cstat-no" title="statement not covered" >      setJsonTables(mapped)</span>
-<span class="cstat-no" title="statement not covered" >    } catch (e: any) {</span>
+<span class="cstat-no" title="statement not covered" >    } catch (e: unknown) {</span>
 <span class="cstat-no" title="statement not covered" >      // Fallback: try parsing locally to give feedback</span>
 <span class="cstat-no" title="statement not covered" >      try {</span>
 <span class="cstat-no" title="statement not covered" >        const parsed = JSON.parse(jsonText)</span>
 <span class="cstat-no" title="statement not covered" >        const mapped = tablesFromCanonicalSchema(parsed)</span>
 <span class="cstat-no" title="statement not covered" >        setJsonTables(mapped)</span>
 <span class="cstat-no" title="statement not covered" >      } catch (_) {</span>
-<span class="cstat-no" title="statement not covered" >        setError(e?.response?.data?.detail || e?.message || 'Invalid JSON schema')</span>
+<span class="cstat-no" title="statement not covered" >        setError(extractError(e, 'Invalid JSON schema'))</span>
 <span class="cstat-no" title="statement not covered" >      }</span>
 <span class="cstat-no" title="statement not covered" >    } finally {</span>
 <span class="cstat-no" title="statement not covered" >      setJsonValidating(false)</span>
@@ -938,7 +989,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
   return (
-    &lt;Modal show={show} onHide={closeAndReset} size="lg" backdrop="static"&gt;
+  &lt;Modal show={show} onHide={closeAndReset} size="lg" backdrop="static" animation={false}&gt;
       &lt;Modal.Header closeButton&gt;
         &lt;Modal.Title&gt;Add Entity&lt;/Modal.Title&gt;
       &lt;/Modal.Header&gt;
@@ -960,7 +1011,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
           &lt;Form.Control.Feedback type="invalid"&gt;Name must be unique in this project.&lt;/Form.Control.Feedback&gt;
         &lt;/Form.Group&gt;
 &nbsp;
-        &lt;Tabs activeKey={tab} onSelect={<span class="fstat-no" title="function not covered" >(k) =&gt; setTab((k as any) || 'ddl')}&gt;</span>
+  &lt;Tabs activeKey={tab} onSelect={<span class="fstat-no" title="function not covered" >(k) =&gt; setTab((k as 'ddl' | 'json' | 'fields') ?? 'ddl')}&gt;</span>
           &lt;Tab eventKey="ddl" title="DDL"&gt;
             &lt;div className="pt-3"&gt;
               &lt;Row className="mb-2"&gt;
@@ -1111,7 +1162,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:58:00.758Z
+                at 2025-11-08T19:11:51.020Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

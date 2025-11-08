@@ -1,0 +1,51 @@
+name: SBOM and License Report
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  generate-sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Syft
+        shell: bash
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .
+
+      - name: Generate SBOM (frontend dir)
+        shell: bash
+        run: |
+          ./syft dir:./apps/frontend -o spdx-json > sbom-frontend-dir.spdx.json
+
+      - name: Generate SBOM (backend dir)
+        shell: bash
+        run: |
+          ./syft dir:./apps/backend -o spdx-json > sbom-backend-dir.spdx.json
+
+      - name: License summary
+        shell: bash
+        run: |
+          node scripts/sbom-license-summary.mjs sbom-frontend-dir.spdx.json sbom-backend-dir.spdx.json --out sbom-license-summary.md
+          echo "## SBOM & License Summary" >> $GITHUB_STEP_SUMMARY
+          sed -n '1,120p' sbom-license-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-dir
+          path: |
+            sbom-frontend-dir.spdx.json
+            sbom-backend-dir.spdx.json
+            sbom-license-summary.md

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">56.87% </span>
+                <span class="strong">57.81% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>153/269</span>
+                <span class='fraction'>159/275</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">56.87% </span>
+                <span class="strong">57.81% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>153/269</span>
+                <span class='fraction'>159/275</span>
             </div>
         
             
@@ -332,7 +332,13 @@
 <a name='L267'></a><a href='#L267'>267</a>
 <a name='L268'></a><a href='#L268'>268</a>
 <a name='L269'></a><a href='#L269'>269</a>
-<a name='L270'></a><a href='#L270'>270</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -536,7 +542,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
@@ -574,6 +580,7 @@
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">51x</span>
@@ -583,8 +590,13 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -805,7 +817,7 @@ const WizardContext = createContext&lt;{
   dispatch: React.Dispatch&lt;Action&gt;
 } | null&gt;(null)
 &nbsp;
-export function WizardProvider({ children, initialProjectId }: { children: React.ReactNode; initialProjectId?: string }) {
+function WizardProviderImpl({ children, initialProjectId }: { children: React.ReactNode; initialProjectId?: string }) {
   const [state, dispatch] = useReducer(reducer, {
     projectId: initialProjectId,
     entities: [],
@@ -844,13 +856,18 @@ export function WizardProvider({ children, initialProjectId }: { children: React
   return &lt;WizardContext.Provider value={value}&gt;{children}&lt;/WizardContext.Provider&gt;
 }
 &nbsp;
+// eslint-disable-next-line react-refresh/only-export-components -- Hook export is intentional for consumers
 export function useWizard() {
   const ctx = useContext(WizardContext)
   if (!ctx) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error('useWizard must be used within WizardProvider')</span>
   return ctx
 }
 &nbsp;
+// Export component separately to satisfy react-refresh/only-export-components rule
+export const WizardProvider = WizardProviderImpl
+&nbsp;
 // Helpers to validate uniqueness
+// eslint-disable-next-line react-refresh/only-export-components -- Pure helper function; safe to export
 export function isEntityNameUnique(name: string, entities: EntitySchema[]) {
   return !entities.some((e) =&gt; e.name.trim().toLowerCase() === name.trim().toLowerCase())
 }
@@ -859,6 +876,7 @@ export function isEntityNameUnique(name: string, entities: EntitySchema[]) {
 type CanonicalColumn = { name: string; dtype: string; nullable: boolean }
 type CanonicalTable = { name: string; columns?: CanonicalColumn[]; pk?: string[]; uniques?: string[][] }
 &nbsp;
+// eslint-disable-next-line react-refresh/only-export-components -- Utility mapping function needed externally
 export <span class="fstat-no" title="function not covered" >function tablesFromCanonicalSchema(schema: { tables: CanonicalTable[] }): Table[] {</span>
 <span class="cstat-no" title="statement not covered" >  const tables = (schema?.tables ?? []).map((t) =&gt; ({</span>
 <span class="cstat-no" title="statement not covered" >    name: String(t.name),</span>
@@ -877,7 +895,7 @@ export <span class="fstat-no" title="function not covered" >function tablesFromC
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:58:00.758Z
+                at 2025-11-08T19:11:51.020Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

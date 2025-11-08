@@ -17,17 +17,16 @@ function TestApp() {
 }
 
 describe('App', () => {
-  it('renders without crashing', () => {
+  it('renders without crashing', async () => {
     const queryClient = new QueryClient()
     render(
       <QueryClientProvider client={queryClient}>
+        {/* Use default behavior to avoid startTransition warnings in tests */}
         <BrowserRouter>
           <TestApp />
         </BrowserRouter>
       </QueryClientProvider>
     )
-    expect(
-      screen.getByRole('heading', { name: /Generate High-Quality Synthetic Data/i })
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Generate High-Quality Synthetic Data/i })).toBeInTheDocument()
   })
 })

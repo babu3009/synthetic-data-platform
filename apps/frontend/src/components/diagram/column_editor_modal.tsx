@@ -17,7 +17,7 @@ export default function ColumnEditorModal({ show, column, onSave, onHide }: Prop
 
   if (!state) return null
   return (
-    <Modal show={show} onHide={onHide} backdrop="static">
+  <Modal show={show} onHide={onHide} backdrop="static" animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Edit Column: {state.name}</Modal.Title>
       </Modal.Header>

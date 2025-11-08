@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "onboarding": false,
+  "timezone": "UTC",
+  "schedule": ["before 5am on monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["^@types/"],
+      "groupName": "types"
+    },
+    {
+      "matchPackagePatterns": ["eslint", "prettier", "ruff", "black", "mypy"],
+      "groupName": "lint-and-format"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "matchManagers": ["pip"],
+      "enabled": true,
+      "groupName": "python-packages"
+    },
+    {
+      "matchManagers": ["npm"],
+      "enabled": true,
+      "groupName": "frontend-packages"
+    }
+  ]
+}

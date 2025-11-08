@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.67% </span>
+                <span class="strong">93.47% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>311/332</span>
+                <span class='fraction'>315/337</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.67% </span>
+                <span class="strong">93.47% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>311/332</span>
+                <span class='fraction'>315/337</span>
             </div>
         
             
@@ -395,7 +395,12 @@
 <a name='L330'></a><a href='#L330'>330</a>
 <a name='L331'></a><a href='#L331'>331</a>
 <a name='L332'></a><a href='#L332'>332</a>
-<a name='L333'></a><a href='#L333'>333</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -479,6 +484,11 @@
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
@@ -787,9 +797,9 @@ export default function LlmSettingsPage() {
   // Primitive snapshots to drive initialization without depending on object identity
   const depProviderId = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >provider_id || undefined</span>
   const depModelId = settingsQ.data?.model_id || undefined
-  const depTemp = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >temperature ?? ''</span>
-  const depTopP = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >top_p ?? ''</span>
-  const depMaxTokens = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >max_tokens ?? ''</span>
+  const depTemp: number | '' = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >temperature ?? ''</span>
+  const depTopP: number | '' = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >top_p ?? ''</span>
+  const depMaxTokens: number | '' = settingsQ.data?.<span class="branch-0 cbranch-no" title="branch not covered" >max_tokens ?? ''</span>
   const depBlockPii = !!settingsQ.data?.guardrails?.block_pii
   const depAllowToolUse = !!settingsQ.data?.guardrails?.allow_tool_use
 &nbsp;
@@ -798,7 +808,7 @@ export default function LlmSettingsPage() {
   React.useEffect(() =&gt; {
     const nextProvider = depProviderId
     const nextModel = depModelId
-    const nextAdv = {
+    const nextAdv: { temperature: number | ''; top_p: number | ''; max_tokens: number | '' } = {
       temperature: depTemp,
       top_p: depTopP,
       max_tokens: depMaxTokens,
@@ -809,11 +819,16 @@ export default function LlmSettingsPage() {
     }
     setProviderId((prev) =&gt; (prev !== nextProvider ? <span class="branch-0 cbranch-no" title="branch not covered" >nextProvider : prev))</span>
     setModelId((prev) =&gt; (prev !== <span class="branch-0 cbranch-no" title="branch not covered" >nextModel ? nextModel : p</span>rev))
-    setAdvParams((prev) =&gt; (
-      prev.temperature !== nextAdv.temperature || prev.top_p !== nextAdv.top_p || prev.max_tokens !== nextAdv.<span class="branch-0 cbranch-no" title="branch not covered" >max_tokens</span>
-<span class="cstat-no" title="statement not covered" >        ? nextAdv</span>
-        : prev
-    ))
+    setAdvParams((prev) =&gt; {
+      if (
+        prev.temperature !== nextAdv.temperature ||
+        prev.top_p !== nextAdv.top_p ||
+        prev.max_tokens !== nextAdv.max_tokens
+      ) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >        return nextAdv</span>
+<span class="cstat-no" title="statement not covered" >      }</span>
+      return prev
+    })
     setGuardrails((prev) =&gt; (
       prev.block_pii !== nextGuard.block_pii || prev.allow_tool_use !== nextGuard.<span class="branch-0 cbranch-no" title="branch not covered" >allow_tool_use ? nextGuard : p</span>rev
     ))
@@ -1066,7 +1081,7 @@ export default function LlmSettingsPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:58:00.758Z
+                at 2025-11-08T19:11:51.020Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

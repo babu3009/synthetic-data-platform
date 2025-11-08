@@ -1,0 +1,77 @@
+name: Dependency Freshness Trend
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # daily at 02:30 UTC
+  workflow_dispatch:
+
+jobs:
+  collect-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install frontend deps
+        working-directory: ./apps/frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect frontend outdated
+        working-directory: ./apps/frontend
+        run: pnpm outdated --json > ../../outdated-frontend.json || true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install backend deps
+        working-directory: ./apps/backend
+        run: |
+          poetry install --no-interaction --no-root
+          poetry install --no-interaction
+
+      - name: Collect backend outdated
+        working-directory: ./apps/backend
+        run: poetry run pip list --outdated --format=json > ../../outdated-backend.json || true
+
+      - name: Merge freshness
+        run: node scripts/merge-dependency-freshness.mjs --frontend outdated-frontend.json --backend outdated-backend.json
+
+      - name: Prepare trend snapshots
+        shell: bash
+        run: |
+          mkdir -p trend
+          TS=$(date -u +"%Y%m%dT%H%M%SZ")
+          cp dependency-freshness.json "trend/dependency-freshness-${TS}.json"
+          cp dependency-freshness.md "trend/dependency-freshness-${TS}.md"
+          cp dependency-freshness.json trend/dependency-freshness-latest.json
+          cp dependency-freshness.md trend/dependency-freshness-latest.md
+
+      - name: Upload dependency freshness trend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-freshness-trend
+          path: trend
+
+      - name: Append freshness summary
+        run: |
+          echo "## Dependency Freshness Trend (snapshot)" >> $GITHUB_STEP_SUMMARY
+          cat dependency-freshness.md >> $GITHUB_STEP_SUMMARY

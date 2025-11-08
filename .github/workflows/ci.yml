@@ -29,7 +29,6 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoLogo -NoProfile -Command "Invoke-Pester -Path './testing/pwsh' -CI -Output Detailed"
-  # Fail the pipeline if Pester tests fail
   # Backend linting and testing
   backend-quality:
     runs-on: ubuntu-latest
@@ -77,7 +76,7 @@ jobs:
       run: poetry run mypy .
 
     - name: Test with pytest (enforce coverage)
-      run: poetry run pytest -m "not e2e" --cov=app --cov-report=xml --cov-fail-under=80
+      run: poetry run pytest -m "not e2e" --cov=app --cov-report=xml --cov-fail-under=80 --junitxml=pytest-junit.xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -86,9 +85,38 @@ jobs:
         flags: backend
         name: backend-coverage
 
+    - name: Upload backend coverage xml artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-coverage-xml
+        path: ./apps/backend/coverage.xml
+    
+    - name: Upload Pytest JUnit report (backend)
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-junit
+        path: ./apps/backend/pytest-junit.xml
+
+    - name: Append backend coverage summary to job
+      working-directory: ./apps/backend
+      run: poetry run python ./scripts/coverage_summary.py >> $GITHUB_STEP_SUMMARY
+
+    - name: Record backend cache result
+      shell: bash
+      run: |
+        HIT="${{ steps.cached-poetry-dependencies.outputs.cache-hit }}"
+        echo "{\"manager\":\"poetry\",\"cacheHit\":\"${HIT}\"}" > cache-backend.json
+    - name: Upload backend cache artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cache-backend
+        path: cache-backend.json
+
   # Frontend linting and testing
   frontend-quality:
     runs-on: ubuntu-latest
+    outputs:
+      frontend-summary: ${{ steps.frontend_summary.outputs.summary_json || '' }}
     defaults:
       run:
         working-directory: ./apps/frontend
@@ -113,6 +141,7 @@ jobs:
         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
     - name: Setup pnpm cache
+      id: pnpm_cache
       uses: actions/cache@v3
       with:
         path: ${{ env.STORE_PATH }}
@@ -136,10 +165,42 @@ jobs:
       run: pnpm build
 
     - name: Test with Vitest (coverage + JSON report)
-      run: pnpm vitest run --coverage --reporter=json > vitest-report.json
+      run: pnpm coverage:ci
 
     - name: Flakiness heuristic (frontend)
       run: node ./apps/frontend/scripts/check-flakiness.mjs
+
+    - name: Generate flakiness trend snapshot
+      working-directory: ./apps/frontend
+      run: node ./scripts/append-flakiness-trend.mjs
+
+    - name: Upload flakiness trend artifact (frontend)
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-flakiness-trend
+        path: ./apps/frontend/flakiness-trend.json
+
+    - name: Upload Vitest JSON report (frontend)
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-vitest-json
+        path: ./apps/frontend/vitest-report.json
+
+    - name: Transform Vitest JSON to JUnit
+      working-directory: ./apps/frontend
+      run: node ./scripts/vitest-json-to-junit.mjs
+
+    - name: Upload JUnit test report (frontend)
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-junit
+        path: ./apps/frontend/junit.xml
+
+    - name: Upload coverage summary (frontend)
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-coverage-summary
+        path: ./apps/frontend/coverage/coverage-summary.json
 
     - name: Upload coverage to Codecov (frontend)
       uses: codecov/codecov-action@v3
@@ -147,6 +208,25 @@ jobs:
         file: ./apps/frontend/coverage/lcov.info
         flags: frontend
         name: frontend-coverage
+    - name: Capture frontend coverage summary as output
+      id: frontend_summary
+      shell: bash
+      run: |
+        echo "summary_json=$(cat coverage/coverage-summary.json | tr -d '\n' | sed 's/\"/\\\"/g')" >> $GITHUB_OUTPUT
+
+    - name: Append coverage summary to job
+      run: node ./apps/frontend/scripts/coverage-summary.mjs >> $GITHUB_STEP_SUMMARY
+
+    - name: Record frontend cache result
+      shell: bash
+      run: |
+        HIT="${{ steps.pnpm_cache.outputs.cache-hit }}"
+        echo "{\"manager\":\"pnpm\",\"cacheHit\":\"${HIT}\"}" > cache-frontend.json
+    - name: Upload frontend cache artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cache-frontend
+        path: cache-frontend.json
 
   # Build and push Docker images (only on main branch)
   build-images:
@@ -156,6 +236,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
     - name: Checkout code
@@ -252,6 +333,181 @@ jobs:
         labels: ${{ steps.meta-frontend.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+    - name: Capture container image sizes
+      shell: bash
+      run: |
+        set -e
+        export BACKEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
+        export FRONTEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
+        echo "Inspecting $BACKEND_REF and $FRONTEND_REF"
+        docker buildx imagetools inspect --format '{{json .}}' "$BACKEND_REF" > backend-imagetools.json || echo '{}' > backend-imagetools.json
+        docker buildx imagetools inspect --format '{{json .}}' "$FRONTEND_REF" > frontend-imagetools.json || echo '{}' > frontend-imagetools.json
+        python3 <<'PY'
+        import json, datetime, os
+
+        def read_json(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+
+        def parse_size(obj):
+            try:
+                mans = obj.get('manifests') or []
+                if mans:
+                    sz = mans[0].get('size')
+                    if isinstance(sz, int):
+                        return sz
+            except Exception:
+                pass
+            try:
+                layers = obj.get('manifest', {}).get('layers', [])
+                s = sum(int(l.get('size') or 0) for l in layers)
+                if s:
+                    return s
+            except Exception:
+                pass
+            return 0
+
+        def human(n):
+            n = float(n)
+            for unit in ['B','KB','MB','GB','TB']:
+                if n < 1024 or unit == 'TB':
+                    return f"{n:.1f} {unit}"
+                n /= 1024
+
+        backend_ref = os.environ['BACKEND_REF']
+        frontend_ref = os.environ['FRONTEND_REF']
+        backend_obj = read_json('backend-imagetools.json')
+        frontend_obj = read_json('frontend-imagetools.json')
+        bsize = parse_size(backend_obj)
+        fsize = parse_size(frontend_obj)
+        out = {
+            'generatedAt': datetime.datetime.utcnow().isoformat()+'Z',
+            'backend': {'ref': backend_ref, 'sizeBytes': bsize, 'sizeHuman': human(bsize)},
+            'frontend': {'ref': frontend_ref, 'sizeBytes': fsize, 'sizeHuman': human(fsize)}
+        }
+        with open('image-sizes.json','w', encoding='utf-8') as f:
+            json.dump(out, f, indent=2)
+        with open('image-sizes.md','w', encoding='utf-8') as f:
+            f.write('# Container Image Sizes\n\n')
+            f.write(f"Generated: {out['generatedAt']}\n\n")
+            f.write(f"- Backend ({out['backend']['ref']}): {out['backend']['sizeHuman']} ({out['backend']['sizeBytes']} bytes)\n")
+            f.write(f"- Frontend ({out['frontend']['ref']}): {out['frontend']['sizeHuman']} ({out['frontend']['sizeBytes']} bytes)\n")
+        PY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Container Image Sizes" >> $GITHUB_STEP_SUMMARY
+        cat image-sizes.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload image size artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: image-sizes
+        path: |
+          image-sizes.json
+          image-sizes.md
+    - name: Generate SBOM (backend image)
+      if: success()
+      shell: bash
+      run: |
+        set -e
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
+        echo "Generating SBOM for $IMAGE"
+        curl -fsSL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .
+        ./syft $IMAGE -o spdx-json > sbom-backend.spdx.json || { echo 'Syft failed'; exit 1; }
+    - name: Generate SBOM (frontend image)
+      if: success()
+      shell: bash
+      run: |
+        set -e
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
+        echo "Generating SBOM for $IMAGE"
+        if [ ! -f syft ]; then curl -fsSL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .; fi
+        ./syft $IMAGE -o spdx-json > sbom-frontend.spdx.json || { echo 'Syft failed'; exit 1; }
+    - name: Summarize SBOM licenses
+      if: success()
+      shell: bash
+      run: |
+        node scripts/sbom-license-summary.mjs sbom-backend.spdx.json sbom-frontend.spdx.json --out sbom-license-summary.md
+        echo "## SBOM License Summary" >> $GITHUB_STEP_SUMMARY
+        sed -n '1,120p' sbom-license-summary.md >> $GITHUB_STEP_SUMMARY
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: |
+          sbom-backend.spdx.json
+          sbom-frontend.spdx.json
+          sbom-license-summary.md
+    - name: Install cosign
+      if: success()
+      shell: bash
+      run: |
+        COSIGN_VERSION="v2.4.1"
+        curl -sSL -o cosign.tgz https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64.tgz
+        tar -xzf cosign.tgz cosign
+        chmod +x cosign
+        ./cosign version || true
+    - name: Sign images with Cosign (keyless)
+      if: success()
+      shell: bash
+      env:
+        COSIGN_EXPERIMENTAL: "1"
+      run: |
+        set -e
+        BACKEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
+        FRONTEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
+        echo "Signing $BACKEND_REF and $FRONTEND_REF via OIDC keyless"
+        ./cosign sign --yes "$BACKEND_REF"
+        ./cosign sign --yes "$FRONTEND_REF"
+    - name: Generate SBOM attestations
+      if: success()
+      shell: bash
+      env:
+        COSIGN_EXPERIMENTAL: "1"
+      run: |
+        set -e
+        BACKEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
+        FRONTEND_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
+        echo "Attesting SBOMs to images"
+        ./cosign attest --yes --predicate sbom-backend.spdx.json --type spdxjson "$BACKEND_REF" || echo "Attestation skipped"
+        ./cosign attest --yes --predicate sbom-frontend.spdx.json --type spdxjson "$FRONTEND_REF" || echo "Attestation skipped"
+    - name: Upload Cosign signature and attestation notes
+      if: always()
+      shell: bash
+      run: |
+        echo "Cosign keyless signing attempted. See image registry for signatures/attestations." > cosign-summary.md
+        echo "## Image Signing & Attestation" >> $GITHUB_STEP_SUMMARY
+        cat cosign-summary.md >> $GITHUB_STEP_SUMMARY
+      
+    - name: Install Dive
+      shell: bash
+      run: |
+        curl -L https://github.com/wagoodman/dive/releases/download/v0.11.0/dive_0.11.0_linux_amd64.tar.gz | tar -xz --strip-components=1 dive
+        chmod +x dive
+    - name: Analyze backend image layers with Dive
+      shell: bash
+      run: |
+        ./dive --ci --json dive-backend.json "${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest" || true
+    - name: Analyze frontend image layers with Dive
+      shell: bash
+      run: |
+        ./dive --ci --json dive-frontend.json "${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest" || true
+    - name: Summarize image layer analysis
+      shell: bash
+      run: |
+        node scripts/parse-dive-report.mjs --backend dive-backend.json --frontend dive-frontend.json --out dive-summary.md
+        echo "## Image Layer Analysis" >> $GITHUB_STEP_SUMMARY
+        sed -n '1,120p' dive-summary.md >> $GITHUB_STEP_SUMMARY
+    - name: Upload image layer artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: image-layer-analysis
+        path: |
+          dive-backend.json
+          dive-frontend.json
+          dive-summary.md
 
   # Security scan
   security-scan:
@@ -275,6 +531,56 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
+
+    - name: Summarize Trivy findings
+      id: trivy_summary
+      shell: bash
+      run: |
+        CRITICAL=$(jq '[.runs[].results[] | select(.level=="error")] | length' trivy-results.sarif)
+        HIGH=$(jq '[.runs[].results[] | select(.level=="warning")] | length' trivy-results.sarif)
+        echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+        echo "high=$HIGH" >> $GITHUB_OUTPUT
+
+    - name: Append security summary to job
+      run: |
+        echo "## Security scan summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Critical: ${{ steps.trivy_summary.outputs.critical }}" >> $GITHUB_STEP_SUMMARY
+        echo "- High: ${{ steps.trivy_summary.outputs.high }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Enforce vulnerability thresholds
+      id: vuln_gate
+      shell: bash
+      env:
+        CRITICAL_MAX: "0"
+        HIGH_MAX: "0"
+      run: |
+        set -e
+        CRIT=${{ steps.trivy_summary.outputs.critical }}
+        HIGH=${{ steps.trivy_summary.outputs.high }}
+        FAIL=0
+        if [ "$CRIT" -gt "$CRITICAL_MAX" ]; then
+          echo "❌ Critical vulnerabilities exceed threshold ($CRIT > $CRITICAL_MAX)" >> $GITHUB_STEP_SUMMARY
+          FAIL=1
+        else
+          echo "✅ Critical vulnerabilities within threshold ($CRIT <= $CRITICAL_MAX)" >> $GITHUB_STEP_SUMMARY
+        fi
+        if [ "$HIGH" -gt "$HIGH_MAX" ]; then
+          echo "❌ High vulnerabilities exceed threshold ($HIGH > $HIGH_MAX)" >> $GITHUB_STEP_SUMMARY
+          FAIL=1
+        else
+          echo "✅ High vulnerabilities within threshold ($HIGH <= $HIGH_MAX)" >> $GITHUB_STEP_SUMMARY
+        fi
+        if [ $FAIL -eq 1 ]; then
+          echo "status=failed" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "status=passed" >> $GITHUB_OUTPUT
+
+    - name: Upload security trend artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-trend
+        path: trivy-results.sarif
 
   backend-e2e:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
@@ -335,3 +641,641 @@ jobs:
         if: always()
         working-directory: ./infra
         run: docker compose down -v
+
+  pr-coverage-comment:
+    if: github.event_name == 'pull_request'
+    needs: [frontend-quality, backend-quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Download frontend coverage summary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage-summary
+          path: frontend-artifacts
+
+      - name: Download backend coverage xml artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage-xml
+          path: backend-artifacts
+
+      - name: Download previous frontend coverage summary (base branch)
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: ci.yml
+          name: frontend-coverage-summary
+          branch: ${{ github.event.pull_request.base.ref }}
+          path: prev-coverage
+          if_no_artifact_found: warn
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate coverage regression (frontend)
+        shell: bash
+        run: |
+          node scripts/coverage-regression.mjs \
+            --current frontend-artifacts/coverage/coverage-summary.json \
+            --previous prev-coverage/coverage/coverage-summary.json \
+            --out coverage-regression.md || echo "No previous coverage available"
+
+      - name: Upload coverage regression artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-regression
+          path: |
+            coverage-regression.md
+
+      - name: Parse coverage metrics
+        id: parse_cov
+        shell: bash
+        run: |
+          python3 - << 'PY'
+          import json, xml.etree.ElementTree as ET, os
+          def set_output(k, v):
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"{k}={v}\n")
+          # Frontend
+          with open('frontend-artifacts/coverage/coverage-summary.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          total = data.get('total', {})
+          def pct(section):
+              v = total.get(section, {}).get('pct')
+              return 'n/a' if v is None else f"{v:.2f}"
+          set_output('fe_lines', pct('lines'))
+          set_output('fe_statements', pct('statements'))
+          set_output('fe_functions', pct('functions'))
+          set_output('fe_branches', pct('branches'))
+          # Backend (Cobertura XML)
+          tree = ET.parse('backend-artifacts/coverage.xml')
+          root = tree.getroot()
+          def pct_from_attr(name):
+              v = root.attrib.get(name)
+              return 'n/a' if v is None else f"{float(v)*100:.2f}"
+          set_output('be_lines', pct_from_attr('line-rate'))
+          set_output('be_branches', pct_from_attr('branch-rate'))
+          PY
+
+      - name: Post or update PR coverage comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- coverage-comment -->';
+            const fs = require('fs');
+            const fe = {
+              lines: core.getInput('fe_lines') || process.env.FE_LINES,
+              statements: core.getInput('fe_statements') || process.env.FE_STATEMENTS,
+              functions: core.getInput('fe_functions') || process.env.FE_FUNCTIONS,
+              branches: core.getInput('fe_branches') || process.env.FE_BRANCHES,
+            };
+            const be = {
+              lines: core.getInput('be_lines') || process.env.BE_LINES,
+              branches: core.getInput('be_branches') || process.env.BE_BRANCHES,
+            };
+            let regression = '';
+            try {
+              regression = fs.readFileSync('coverage-regression.md','utf8');
+            } catch {}
+            const body = `${marker}\n` +
+              `## Coverage Summary\n\n` +
+              `Frontend (Vitest)\n` +
+              `- Lines: ${fe.lines}%\n` +
+              `- Statements: ${fe.statements}%\n` +
+              `- Functions: ${fe.functions}%\n` +
+              `- Branches: ${fe.branches}%\n\n` +
+              `Backend (Pytest/Cobertura)\n` +
+              `- Lines: ${be.lines}%\n` +
+              `- Branches: ${be.branches}%\n` +
+              (regression ? `\n${regression}\n` : '');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find(c => c.user?.type === 'Bot' && c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+        env:
+          FE_LINES: ${{ steps.parse_cov.outputs.fe_lines }}
+          FE_STATEMENTS: ${{ steps.parse_cov.outputs.fe_statements }}
+          FE_FUNCTIONS: ${{ steps.parse_cov.outputs.fe_functions }}
+          FE_BRANCHES: ${{ steps.parse_cov.outputs.fe_branches }}
+          BE_LINES: ${{ steps.parse_cov.outputs.be_lines }}
+          BE_BRANCHES: ${{ steps.parse_cov.outputs.be_branches }}
+
+  openapi-drift:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [backend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install backend
+        working-directory: ./apps/backend
+        run: |
+          poetry install --no-interaction --no-root
+          poetry install --no-interaction
+
+      - name: Generate & check OpenAPI
+        shell: bash
+        run: |
+          python3 apps/backend/scripts/openapi_diff.py | tee openapi-summary.txt
+        continue-on-error: true
+
+      - name: Upload OpenAPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-artifacts
+          path: |
+            apps/backend/openapi-current.json
+            apps/backend/openapi-base.json
+            openapi-summary.txt
+
+      - name: Fail on drift
+        shell: bash
+        run: |
+          python3 apps/backend/scripts/openapi_diff.py > /dev/null
+
+  dependency-freshness:
+    # Run on PRs and pushes to report outdated dependencies for frontend and backend
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality, backend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Collect frontend outdated (pnpm)
+        working-directory: ./apps/frontend
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          # pnpm outdated returns non-zero when outdated are found, so ignore failure
+          pnpm outdated --json > ../../outdated-frontend.json || true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv (backend)
+        id: cached-poetry-deps-freshness
+        uses: actions/cache@v3
+        with:
+          path: ./apps/backend/.venv
+          key: venv-freshness-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install backend dependencies
+        if: steps.cached-poetry-deps-freshness.outputs.cache-hit != 'true'
+        working-directory: ./apps/backend
+        run: poetry install --no-interaction --no-root
+
+      - name: Ensure project installed (backend)
+        working-directory: ./apps/backend
+        run: poetry install --no-interaction
+
+      - name: Collect backend outdated (pip inside Poetry venv)
+        working-directory: ./apps/backend
+        shell: bash
+        run: |
+          poetry run pip list --outdated --format=json > ../../outdated-backend.json || true
+
+      - name: Merge dependency freshness and summarize
+        id: merge_freshness
+        shell: bash
+        run: |
+          python3 - << 'PY'
+          import json, os, sys, datetime
+          from pathlib import Path
+
+          root = Path('.')
+          fe_path = root / 'outdated-frontend.json'
+          be_path = root / 'outdated-backend.json'
+          fe = []
+          be = []
+          if fe_path.exists() and fe_path.stat().st_size > 0:
+              try:
+                  fe = json.loads(fe_path.read_text(encoding='utf-8')) or []
+              except Exception:
+                  fe = []
+          if be_path.exists() and be_path.stat().st_size > 0:
+              try:
+                  be = json.loads(be_path.read_text(encoding='utf-8')) or []
+              except Exception:
+                  be = []
+
+          # Normalize frontend shape (pnpm)
+          def norm_fe(item):
+              # pnpm outdated json typically has fields: name, current, wanted, latest, type
+              return {
+                  'name': item.get('name'),
+                  'current': item.get('current'),
+                  'wanted': item.get('wanted'),
+                  'latest': item.get('latest'),
+                  'type': item.get('type'),
+              }
+
+          # Normalize backend shape (pip)
+          def norm_be(item):
+              # pip list --outdated --format=json fields: name, version, latest_version, latest_filetype
+              return {
+                  'name': item.get('name'),
+                  'current': item.get('version'),
+                  'latest': item.get('latest_version'),
+                  'filetype': item.get('latest_filetype'),
+              }
+
+          fe_norm = [norm_fe(x) for x in (fe if isinstance(fe, list) else [])]
+          be_norm = [norm_be(x) for x in (be if isinstance(be, list) else [])]
+
+          out = {
+              'generatedAt': datetime.datetime.utcnow().isoformat() + 'Z',
+              'frontend': {
+                  'manager': 'pnpm',
+                  'count': len(fe_norm),
+                  'packages': fe_norm,
+              },
+              'backend': {
+                  'manager': 'pip',
+                  'count': len(be_norm),
+                  'packages': be_norm,
+              }
+          }
+
+          Path('dependency-freshness.json').write_text(json.dumps(out, indent=2), encoding='utf-8')
+
+          # Create a markdown summary
+          def list_pkgs(pkgs, fields=('name','current','latest')):
+              lines = []
+              for p in sorted(pkgs, key=lambda x: (x.get('name') or '').lower())[:20]:
+                  name = p.get('name')
+                  cur = p.get('current')
+                  lat = p.get('latest')
+                  lines.append(f"- {name}: {cur} → {lat}")
+              return '\n'.join(lines) if lines else '_None_'
+
+          md = []
+          md.append('# Dependency Freshness Report')
+          md.append('')
+          md.append(f"Generated: {out['generatedAt']}")
+          md.append('')
+          md.append('## Frontend (pnpm)')
+          md.append(f"Outdated packages: {out['frontend']['count']}")
+          md.append(list_pkgs(out['frontend']['packages']))
+          md.append('')
+          md.append('## Backend (pip)')
+          md.append(f"Outdated packages: {out['backend']['count']}")
+          md.append(list_pkgs(out['backend']['packages']))
+          md_text = '\n'.join(md)
+          Path('dependency-freshness.md').write_text(md_text, encoding='utf-8')
+
+          # Append concise summary to job summary
+          summary = []
+          summary.append('## Dependency Freshness Summary')
+          summary.append(f"- Frontend (pnpm) outdated: {out['frontend']['count']}")
+          summary.append(f"- Backend (pip) outdated: {out['backend']['count']}")
+          print('\n'.join(summary))
+          PY
+          # Append the printed summary to the job summary
+          python3 - << 'PY'
+          import os
+          with open('dependency-freshness.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as s:
+              s.write("\n\n## Full Dependency Freshness Report\n\n")
+              s.write(content)
+          PY
+
+      - name: Upload dependency freshness artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-freshness
+          path: |
+            dependency-freshness.json
+            dependency-freshness.md
+            outdated-frontend.json
+            outdated-backend.json
+
+  test-duration-trend:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality, backend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Vitest JSON (frontend)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-vitest-json
+          path: frontend-artifacts
+
+      - name: Download Pytest JUnit (backend)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-junit
+          path: backend-artifacts
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Aggregate test durations
+        run: node scripts/aggregate-test-durations.mjs --vitest frontend-artifacts/vitest-report.json --pytest backend-artifacts/pytest-junit.xml
+
+      - name: Upload test duration trend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-duration-trend
+          path: |
+            test-duration-trend.json
+            test-duration-trend.md
+
+      - name: Append test duration summary to job
+        run: |
+          echo "## Test Duration Summary" >> $GITHUB_STEP_SUMMARY
+          cat test-duration-trend.md >> $GITHUB_STEP_SUMMARY
+      - name: Enforce slow test threshold
+        shell: bash
+        env:
+          MAX_TEST_DURATION_MS: "2000"
+        run: |
+          set -e
+          MAX=${MAX_TEST_DURATION_MS}
+          TOP=$(jq '[.topOverall[]?.durationMs] | max' test-duration-trend.json 2>/dev/null || echo 0)
+          echo "Max observed test duration: ${TOP} ms" >> $GITHUB_STEP_SUMMARY
+          if [ "$TOP" -gt "$MAX" ]; then
+            echo "❌ Slow test threshold exceeded (${TOP} ms > ${MAX} ms)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ Slow test threshold OK (${TOP} ms <= ${MAX} ms)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  flakiness-gate:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download flakiness snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-flakiness-trend
+          path: frontend-artifacts
+      - name: Download Vitest JSON (frontend)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-vitest-json
+          path: frontend-artifacts
+      - name: Enforce flakiness threshold
+        shell: bash
+        env:
+          FLAKY_RATE_MAX: "0.03" # 3%
+          FLAKY_MAX: "10"       # absolute cap
+        run: |
+          set -e
+          SNAP="frontend-artifacts/flakiness-trend.json"
+          REP="frontend-artifacts/vitest-report.json"
+          if ! command -v jq >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y jq; fi
+          if [ ! -f "$SNAP" ] || [ ! -f "$REP" ]; then
+            echo "Flakiness or Vitest report not found; skipping gate" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          FLAKY=$(jq -r '.flakyCount // 0' "$SNAP")
+          TOTAL=$(jq '[.testResults[]?.assertionResults[]] | length' "$REP")
+          if [ "$TOTAL" -gt 0 ]; then
+            RATE=$(awk -v f="$FLAKY" -v t="$TOTAL" 'BEGIN { printf "%.5f", (t>0)?f/t:0 }')
+          else
+            RATE=0
+          fi
+          echo "## Flakiness Gate" >> $GITHUB_STEP_SUMMARY
+          echo "Flaky tests: $FLAKY" >> $GITHUB_STEP_SUMMARY
+          echo "Total tests: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "Rate: $RATE" >> $GITHUB_STEP_SUMMARY
+          # Compare rate and absolute count
+          FAIL=0
+          awk -v rate="$RATE" -v maxr="$FLAKY_RATE_MAX" 'BEGIN { exit (rate>maxr) ? 1 : 0 }' || FAIL=1
+          if [ "$FLAKY" -gt "$FLAKY_MAX" ]; then FAIL=1; fi
+          if [ $FAIL -eq 1 ]; then
+            echo "❌ Flakiness exceeds thresholds (rate>$FLAKY_RATE_MAX or count>$FLAKY_MAX)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ Flakiness within thresholds" >> $GITHUB_STEP_SUMMARY
+          fi
+ 
+  cache-efficiency-report:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality, backend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download frontend cache artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-frontend
+          path: cache
+      - name: Download backend cache artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-backend
+          path: cache
+      - name: Compose cache efficiency report
+        shell: bash
+        run: |
+          python3 - << 'PY'
+          import json, os
+          from pathlib import Path
+          pfe = Path('cache/cache-frontend.json')
+          pbe = Path('cache/cache-backend.json')
+          def read(p):
+              try:
+                  return json.loads(p.read_text(encoding='utf-8'))
+              except Exception:
+                  return {"manager":"unknown","cacheHit":""}
+          fe = read(pfe)
+          be = read(pbe)
+          out = {"generatedAt":__import__('datetime').datetime.utcnow().isoformat()+"Z","frontend":fe,"backend":be}
+          Path('cache-efficiency.json').write_text(json.dumps(out, indent=2), encoding='utf-8')
+          def fmt(hit):
+              h=str(hit).lower()
+              if h in ("true","1"): return "hit"
+              if h in ("false","0"): return "miss"
+              return "unknown" if h=="" else hit
+          md=["# Cache Efficiency","",f"Generated: {out['generatedAt']}","",f"- Frontend ({fe.get('manager')}): {fmt(fe.get('cacheHit'))}",f"- Backend ({be.get('manager')}): {fmt(be.get('cacheHit'))}"]
+          Path('cache-efficiency.md').write_text("\n".join(md), encoding='utf-8')
+          print("\n".join(["## Cache Efficiency Summary",f"- Frontend: {fmt(fe.get('cacheHit'))}",f"- Backend: {fmt(be.get('cacheHit'))}"]))
+          PY
+          echo "\n## Full Cache Efficiency Report" >> $GITHUB_STEP_SUMMARY
+          cat cache-efficiency.md >> $GITHUB_STEP_SUMMARY
+      - name: Upload cache efficiency artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-efficiency
+          path: |
+            cache-efficiency.json
+            cache-efficiency.md
+
+  slo-dashboard:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality, backend-quality, dependency-freshness, test-duration-trend, cache-efficiency-report]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage-summary
+          path: artifacts/frontend
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage-xml
+          path: artifacts/backend
+      - name: Download flakiness trend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-flakiness-trend
+          path: artifacts/flaky
+      - name: Download test duration trend
+        uses: actions/download-artifact@v4
+        with:
+          name: test-duration-trend
+          path: artifacts/duration
+      - name: Download cache efficiency
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-efficiency
+          path: artifacts/cache
+      - name: Download dependency freshness
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-freshness
+          path: artifacts/freshness
+      - name: Download security trend
+        uses: actions/download-artifact@v4
+        with:
+          name: security-trend
+          path: artifacts/security
+      - name: Attempt to download image size report (if exists)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: image-sizes
+          path: artifacts/images
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Generate SLO dashboard
+        run: node scripts/aggregate-slo.mjs --out-json slo-dashboard.json --out-md slo-dashboard.md
+      - name: Upload SLO dashboard artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slo-dashboard
+          path: |
+            slo-dashboard.json
+            slo-dashboard.md
+      - name: Append SLO summary
+        run: |
+          echo "## SLO Dashboard" >> $GITHUB_STEP_SUMMARY
+          sed -n '1,200p' slo-dashboard.md >> $GITHUB_STEP_SUMMARY
+
+  test-ordering-drift:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [frontend-quality, backend-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download Vitest JSON (frontend)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-vitest-json
+          path: artifacts/frontend
+      - name: Download Pytest JUnit (backend)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-junit
+          path: artifacts/backend
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Get previous snapshot (base branch)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: ci.yml
+          name: test-ordering-snapshot
+          branch: ${{ github.event.pull_request.base.ref }}
+          path: prev
+          if_no_artifact_found: warn
+      - name: Compute test ordering drift
+        run: node scripts/test-ordering-drift.mjs --vitest artifacts/frontend/vitest-report.json --pytest artifacts/backend/pytest-junit.xml --previous prev/test-ordering-snapshot.json --out-snapshot test-ordering-snapshot.json --out-md test-ordering-drift.md
+      - name: Upload test ordering artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-ordering-snapshot
+          path: |
+            test-ordering-snapshot.json
+            test-ordering-drift.md
+      - name: Append test ordering summary
+        run: |
+          echo "## Test Ordering Drift" >> $GITHUB_STEP_SUMMARY
+          sed -n '1,200p' test-ordering-drift.md >> $GITHUB_STEP_SUMMARY
+      - name: Enforce ordering drift threshold
+        shell: bash
+        env:
+          MAX_DRIFT: "0.10" # 10% of total tests reordered as a soft gate
+        run: |
+          set -e
+          TOTAL=$(jq -r '.totals.total // 0' test-ordering-snapshot.json 2>/dev/null || echo 0)
+          DRIFT=$(jq -r '.drift.count // 0' test-ordering-snapshot.json 2>/dev/null || echo 0)
+          RATE=0
+          if [ "$TOTAL" -gt 0 ]; then RATE=$(awk -v d="$DRIFT" -v t="$TOTAL" 'BEGIN { printf "%.5f", (t>0)?d/t:0 }'); fi
+          echo "Total tests: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "Reorder count: $DRIFT" >> $GITHUB_STEP_SUMMARY
+          echo "Reorder rate: $RATE" >> $GITHUB_STEP_SUMMARY
+          awk -v r="$RATE" -v m="$MAX_DRIFT" 'BEGIN { exit (r>m) ? 1 : 0 }' || {
+            echo "❌ Ordering drift exceeds threshold ($RATE > $MAX_DRIFT)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          echo "✅ Ordering drift within threshold" >> $GITHUB_STEP_SUMMARY

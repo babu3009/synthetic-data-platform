@@ -45,7 +45,7 @@ export function ProviderFormModal({ projectId, show, onHide }: Props) {
   }, [kind, reset])
 
   return (
-    <Modal show={show} onHide={onHide} backdrop="static" size="lg">
+  <Modal show={show} onHide={onHide} backdrop="static" size="lg" animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Add LLM Provider</Modal.Title>
       </Modal.Header>

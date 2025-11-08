@@ -49,14 +49,14 @@ importers:
         version: 3.25.76
     devDependencies:
       '@testing-library/jest-dom':
-        specifier: ^6.1.5
+        specifier: ^6.4.0
         version: 6.9.1
       '@testing-library/react':
-        specifier: ^13.4.0
-        version: 13.4.0(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^14.0.0
+        version: 14.3.1(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@testing-library/user-event':
         specifier: ^14.5.1
-        version: 14.6.1(@testing-library/dom@8.20.1)
+        version: 14.6.1(@testing-library/dom@9.3.4)
       '@types/dagre':
         specifier: ^0.7.52
         version: 0.7.53
@@ -634,17 +634,17 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  '@testing-library/dom@8.20.1':
-    resolution: {integrity: sha512-/DiOQ5xBxgdYRC8LNk7U+RWat0S3qRLeIw3ZIkMQ9kkVlRmwD/Eg8k8CqIpD6GW7u20JIUOfMKbxtiLutpjQ4g==}
-    engines: {node: '>=12'}
+  '@testing-library/dom@9.3.4':
+    resolution: {integrity: sha512-FlS4ZWlp97iiNWig0Muq8p+3rVDjRiYE+YKGbAqXOu9nwJFFOdL00kFpz42M+4huzYi86vAK1sOOfyOG45muIQ==}
+    engines: {node: '>=14'}
 
   '@testing-library/jest-dom@6.9.1':
     resolution: {integrity: sha512-zIcONa+hVtVSSep9UT3jZ5rizo2BsxgyDYU7WFD5eICBE7no3881HGeb/QkGfsJs6JTkY1aQhT7rIPC7e+0nnA==}
     engines: {node: '>=14', npm: '>=6', yarn: '>=1'}
 
-  '@testing-library/react@13.4.0':
-    resolution: {integrity: sha512-sXOGON+WNTh3MLE9rve97ftaZukN3oNf2KjDy7YTx6hcTO2uuLHuCGynMDhFwGw/jYf4OJ2Qk0i4i79qMNNkyw==}
-    engines: {node: '>=12'}
+  '@testing-library/react@14.3.1':
+    resolution: {integrity: sha512-H99XjUhWQw0lTgyMN05W3xQG1Nh4lq574D8keFf1dDoNTJgp66VbJozRaczoF+wsiaPJNt/TcnfpLGufGxSrZQ==}
+    engines: {node: '>=14'}
     peerDependencies:
       react: ^18.0.0
       react-dom: ^18.0.0
@@ -3193,7 +3193,7 @@ snapshots:
       '@tanstack/query-core': 5.90.7
       react: 18.3.1
 
-  '@testing-library/dom@8.20.1':
+  '@testing-library/dom@9.3.4':
     dependencies:
       '@babel/code-frame': 7.27.1
       '@babel/runtime': 7.28.4
@@ -3213,19 +3213,19 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
 
-  '@testing-library/react@13.4.0(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@testing-library/react@14.3.1(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@babel/runtime': 7.28.4
-      '@testing-library/dom': 8.20.1
+      '@testing-library/dom': 9.3.4
       '@types/react-dom': 18.3.7(@types/react@18.3.26)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     transitivePeerDependencies:
       - '@types/react'
 
-  '@testing-library/user-event@14.6.1(@testing-library/dom@8.20.1)':
+  '@testing-library/user-event@14.6.1(@testing-library/dom@9.3.4)':
     dependencies:
-      '@testing-library/dom': 8.20.1
+      '@testing-library/dom': 9.3.4
 
   '@tootallnate/once@2.0.0': {}
 

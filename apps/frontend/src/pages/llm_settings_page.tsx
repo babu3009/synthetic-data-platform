@@ -58,9 +58,9 @@ export default function LlmSettingsPage() {
   // Primitive snapshots to drive initialization without depending on object identity
   const depProviderId = settingsQ.data?.provider_id || undefined
   const depModelId = settingsQ.data?.model_id || undefined
-  const depTemp = settingsQ.data?.temperature ?? ''
-  const depTopP = settingsQ.data?.top_p ?? ''
-  const depMaxTokens = settingsQ.data?.max_tokens ?? ''
+  const depTemp: number | '' = settingsQ.data?.temperature ?? ''
+  const depTopP: number | '' = settingsQ.data?.top_p ?? ''
+  const depMaxTokens: number | '' = settingsQ.data?.max_tokens ?? ''
   const depBlockPii = !!settingsQ.data?.guardrails?.block_pii
   const depAllowToolUse = !!settingsQ.data?.guardrails?.allow_tool_use
 
@@ -69,7 +69,7 @@ export default function LlmSettingsPage() {
   React.useEffect(() => {
     const nextProvider = depProviderId
     const nextModel = depModelId
-    const nextAdv = {
+    const nextAdv: { temperature: number | ''; top_p: number | ''; max_tokens: number | '' } = {
       temperature: depTemp,
       top_p: depTopP,
       max_tokens: depMaxTokens,
@@ -80,11 +80,16 @@ export default function LlmSettingsPage() {
     }
     setProviderId((prev) => (prev !== nextProvider ? nextProvider : prev))
     setModelId((prev) => (prev !== nextModel ? nextModel : prev))
-    setAdvParams((prev) => (
-      prev.temperature !== nextAdv.temperature || prev.top_p !== nextAdv.top_p || prev.max_tokens !== nextAdv.max_tokens
-        ? nextAdv
-        : prev
-    ))
+    setAdvParams((prev) => {
+      if (
+        prev.temperature !== nextAdv.temperature ||
+        prev.top_p !== nextAdv.top_p ||
+        prev.max_tokens !== nextAdv.max_tokens
+      ) {
+        return nextAdv
+      }
+      return prev
+    })
     setGuardrails((prev) => (
       prev.block_pii !== nextGuard.block_pii || prev.allow_tool_use !== nextGuard.allow_tool_use ? nextGuard : prev
     ))

@@ -43,7 +43,7 @@ function SuggestionsDiffModal({
   onConfirm: () => void
 }) {
   return (
-    <Modal show={show} onHide={onHide} size="lg">
+  <Modal show={show} onHide={onHide} size="lg" animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Apply provider suggestions</Modal.Title>
       </Modal.Header>

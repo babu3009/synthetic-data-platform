@@ -1,0 +1,23 @@
+coverage:
+  precision: 2
+  round: down
+  status:
+    project:
+      frontend:
+        target: 80%
+        threshold: 1%
+      backend:
+        target: 80%
+        threshold: 1%
+    patch:
+      frontend:
+        target: 80%
+        threshold: 1%
+      backend:
+        target: 80%
+        threshold: 1%
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_base: false
+  require_changes: false
