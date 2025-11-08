@@ -7,5 +7,17 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/tests/setup.ts',
+    coverage: {
+      enabled: true,
+      reporter: ['text', 'lcov'],
+      lines: 80,
+      functions: 80,
+      branches: 70,
+      statements: 80,
+      exclude: [
+        'src/tests/**',
+        'src/**/*.d.ts'
+      ]
+    }
   },
 })

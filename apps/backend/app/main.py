@@ -1,5 +1,6 @@
 import asyncio
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,11 +10,37 @@ from app.api.api_v1.api import api_router
 from app.jobs.cleanup import cleanup_expired_artifacts
 from app.observability import init_observability
 
+_cleanup_task: Optional[asyncio.Task] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # pragma: no cover - integration path
+    global _cleanup_task
+    # Startup
+    interval_minutes = getattr(settings, "CLEANUP_INTERVAL_MINUTES", 24 * 60)
+    try:
+        _cleanup_task = asyncio.create_task(_run_cleanup_periodically(interval_minutes))
+    except Exception:
+        _cleanup_task = None
+    # Yield control to application
+    try:
+        yield
+    finally:
+        # Shutdown
+        if _cleanup_task is not None:
+            _cleanup_task.cancel()
+            try:
+                await _cleanup_task
+            except Exception:
+                pass
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Synthetic Data Platform API",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 # Set all CORS enabled origins
@@ -38,10 +65,6 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok", "message": "Synthetic Data Platform API is running"}
 
 
-# --- Periodic cleanup scheduler (best-effort, non-fatal) ---
-_cleanup_task: Optional[asyncio.Task] = None
-
-
 async def _run_cleanup_periodically(interval_minutes: int) -> None:
     # Sleep a bit after startup to avoid contention
     await asyncio.sleep(5)
@@ -56,27 +79,6 @@ async def _run_cleanup_periodically(interval_minutes: int) -> None:
             pass
         await asyncio.sleep(interval)
 
-
-@app.on_event("startup")
-async def _startup_background_tasks() -> None:  # pragma: no cover - integration path
-    global _cleanup_task
-    # Default once per day; can be overridden via env var if added later
-    interval_minutes = getattr(settings, "CLEANUP_INTERVAL_MINUTES", 24 * 60)
-    try:
-        _cleanup_task = asyncio.create_task(_run_cleanup_periodically(interval_minutes))
-    except Exception:
-        _cleanup_task = None
-
-
-@app.on_event("shutdown")
-async def _shutdown_background_tasks() -> None:  # pragma: no cover - integration path
-    global _cleanup_task
-    if _cleanup_task is not None:
-        _cleanup_task.cancel()
-        try:
-            await _cleanup_task
-        except Exception:
-            pass
 
 
 if __name__ == "__main__":

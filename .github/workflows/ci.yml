@@ -4,7 +4,10 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *' # nightly backend e2e run at 02:00 UTC
 
 env:
   REGISTRY: ghcr.io
@@ -12,6 +15,21 @@ env:
   IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
 
 jobs:
+  powershell-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup PowerShell Modules (Pester latest)
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
+          Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Run Pester tests for scripts
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -Command "Invoke-Pester -Path './testing/pwsh' -CI -Output Detailed"
+  # Fail the pipeline if Pester tests fail
   # Backend linting and testing
   backend-quality:
     runs-on: ubuntu-latest
@@ -58,8 +76,8 @@ jobs:
     - name: Type check with MyPy
       run: poetry run mypy .
 
-    - name: Test with pytest
-      run: poetry run pytest --cov=app --cov-report=xml
+    - name: Test with pytest (enforce coverage)
+      run: poetry run pytest -m "not e2e" --cov=app --cov-report=xml --cov-fail-under=80
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -117,8 +135,18 @@ jobs:
     - name: Build project
       run: pnpm build
 
-    - name: Test with Vitest
-      run: pnpm test
+    - name: Test with Vitest (coverage + JSON report)
+      run: pnpm vitest run --coverage --reporter=json > vitest-report.json
+
+    - name: Flakiness heuristic (frontend)
+      run: node ./apps/frontend/scripts/check-flakiness.mjs
+
+    - name: Upload coverage to Codecov (frontend)
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./apps/frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
 
   # Build and push Docker images (only on main branch)
   build-images:
@@ -247,3 +275,63 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
+
+  backend-e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    needs: [backend-quality]
+    runs-on: ubuntu-latest
+    env:
+      PYTEST_ADDOPTS: ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies-e2e
+        uses: actions/cache@v3
+        with:
+          path: ./apps/backend/.venv
+          key: venv-e2e-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies-e2e.outputs.cache-hit != 'true'
+        working-directory: ./apps/backend
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        working-directory: ./apps/backend
+        run: poetry install --no-interaction
+
+      - name: Spin up infrastructure (docker-compose)
+        working-directory: ./infra
+        run: |
+          docker-compose up -d
+          docker-compose ps
+
+      - name: Wait for services health
+        run: |
+          echo "Waiting for Postgres and Redis...";
+          sleep 10
+
+      - name: Run backend e2e tests
+        working-directory: ./apps/backend
+        run: |
+          echo "Running pytest -m e2e";
+          poetry run pytest -m e2e -q || { echo 'E2E tests failed'; exit 1; }
+
+      - name: Tear down infrastructure
+        if: always()
+        working-directory: ./infra
+        run: docker-compose down -v

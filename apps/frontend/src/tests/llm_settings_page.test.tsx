@@ -133,4 +133,56 @@ describe('LLM Settings Page', () => {
       provider_id: 'prov1',
     })
   })
+
+  it('updates and saves advanced params (temperature, top_p, max_tokens)', async () => {
+    localStorage.setItem('role', 'OWNER')
+    renderWithProviders()
+
+    // Expand advanced
+    const toggle = await screen.findByRole('button', { name: /show advanced/i })
+    fireEvent.click(toggle)
+
+    // Simulate edits: temperature -> 0.9, top_p -> 0.95, max_tokens -> 512
+    const tempInput = await screen.findByLabelText(/Temperature/i)
+    const topPInput = await screen.findByLabelText(/Top P/i)
+    const maxTokensInput = await screen.findByLabelText(/Max Tokens/i)
+
+    // Reset mock before changes
+    saveMutate.mockReset()
+
+    fireEvent.change(tempInput, { target: { value: '0.9' } })
+    fireEvent.change(topPInput, { target: { value: '0.95' } })
+    fireEvent.change(maxTokensInput, { target: { value: '512' } })
+
+    // Should have been called 3 times with incremental updates
+    expect(saveMutate).toHaveBeenCalledTimes(3)
+    const lastPayload = saveMutate.mock.calls[2]?.[0]
+        expect(lastPayload.temperature).toBeCloseTo(0.9)
+        expect(lastPayload.top_p).toBeCloseTo(0.95)
+        expect(lastPayload.max_tokens).toBe(512)
+  })
+
+  it('toggles and saves guardrails switches (block_pii, allow_tool_use)', async () => {
+    localStorage.setItem('role', 'OWNER')
+    renderWithProviders()
+
+    // Expand advanced
+    const toggle = await screen.findByRole('button', { name: /show advanced/i })
+    fireEvent.click(toggle)
+
+    const piiSwitch = screen.getByLabelText(/Block PII in prompts/i)
+    const toolUseSwitch = screen.getByLabelText(/Allow Tool Use/i)
+
+    saveMutate.mockReset()
+
+    // Toggle block_pii off and allow_tool_use on
+    fireEvent.click(piiSwitch)
+    fireEvent.click(toolUseSwitch)
+
+    // Two mutations expected
+    expect(saveMutate).toHaveBeenCalledTimes(2)
+    const finalPayload = saveMutate.mock.calls[1]?.[0]
+    expect(finalPayload.guardrails.block_pii).toBe(false)
+    expect(finalPayload.guardrails.allow_tool_use).toBe(true)
+  })
 })

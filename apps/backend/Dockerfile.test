@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps (only what tests may need)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy poetry files
+COPY pyproject.toml poetry.lock* ./
+
+# Install Poetry
+RUN pip install poetry
+RUN poetry config virtualenvs.create false
+
+# Install all (include dev dependencies for tests)
+RUN poetry install --no-interaction --no-ansi
+
+# Copy app source
+COPY . .
+
+# Default command runs pytest (quiet) and exits with code
+CMD ["poetry", "run", "pytest", "-q"]

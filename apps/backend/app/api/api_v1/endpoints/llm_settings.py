@@ -56,14 +56,14 @@ async def put_settings(
 
     # Server-side validation that model_id belongs to provider_id if both set
     if body.model_id and not body.provider_id:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="model_id requires provider_id")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="model_id requires provider_id")
     if body.model_id and body.provider_id:
         res = await db.execute(select(LLMModel).where(LLMModel.id == body.model_id))
         model = res.scalar_one_or_none()
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         if str(model.provider_id) != str(body.provider_id):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="model_id does not belong to provider_id")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="model_id does not belong to provider_id")
     if existing:
         updated = await crud_setting.update(db, db_obj=existing, obj_in=body)
     else:

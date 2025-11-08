@@ -171,7 +171,7 @@ async def get_source_schema(
     return schemas.SchemaResponse(
         id=schema_record.id,
         source_id=schema_record.source_id,
-        schema=canonical_schema,
+        canonical_schema=canonical_schema,
         dag=dag,
         warnings=schema_record.warnings,
         created_at=schema_record.created_at

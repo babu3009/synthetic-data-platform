@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Tabs, Tab, Container } from 'react-bootstrap'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { WizardProvider, useWizard } from '../state/wizard'
 import { useUnsavedChangesWarning } from '../hooks/use_unsaved_changes'
 import EntitiesPage from './wizard/entities_page'
@@ -11,15 +11,25 @@ import OutputsRunPage from './wizard/outputs_run_page'
 
 function WizardInner() {
   const { state, dispatch } = useWizard()
-  const [params] = useSearchParams()
+  const [query] = useSearchParams()
+  const params = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // Global unsaved-changes guard
   const { confirmProceed } = useUnsavedChangesWarning(state.isDirty)
 
   useEffect(() => {
-    const pid = params.get('projectId') || undefined
+    const routePid = params.projectId
+    const queryPid = query.get('projectId') || undefined
+    // Redirect legacy /wizard?projectId=... to /projects/:projectId/wizard
+    if (!routePid && queryPid && location.pathname === '/wizard') {
+      navigate(`/projects/${queryPid}/wizard`, { replace: true })
+      return
+    }
+    const pid = (routePid || queryPid) as string | undefined
     if (pid) dispatch({ type: 'setProject', projectId: pid })
-  }, [params, dispatch])
+  }, [params, query, dispatch, navigate, location.pathname])
 
   return (
     <Container className="py-3">

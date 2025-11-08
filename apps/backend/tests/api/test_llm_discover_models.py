@@ -135,3 +135,55 @@ async def test_discover_models_ollama(async_client: AsyncClient, db_session: Asy
     names = [m["name"] for m in data.get("models", [])]
     assert "llama3:instruct" in names
     assert data.get("added_count", 0) >= 1
+
+
+@pytest.mark.asyncio
+async def test_discover_models_anthropic(async_client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    # Create a project
+    project = await crud.project.create(db=db_session, obj_in=schemas.ProjectCreate(
+        name="LLM Discover Anthropic",
+        owner="owner@example.com",
+        tags=["llm"],
+    ))
+
+    # Create Anthropic provider (no base_url required; default is used)
+    provider = LLMProvider(kind=LLMProviderKind.ANTHROPIC, name="anthropic-admin", is_enabled=True)
+    db_session.add(provider)
+    await db_session.commit()
+
+    # Monkeypatch httpx.AsyncClient
+    import httpx
+    monkeypatch.setattr(httpx, "AsyncClient", DummyAsyncClient)
+
+    resp = await async_client.post(f"/api/v1/admin/llm/providers/{provider.id}:discover-models", params={"project_id": str(project.id)})
+    assert resp.status_code == 200
+    data = resp.json()
+    names = [m["name"] for m in data.get("models", [])]
+    assert any("claude" in n for n in names)
+    assert "added_count" in data and "updated_count" in data and "unchanged_count" in data
+
+
+@pytest.mark.asyncio
+async def test_discover_models_lmstudio(async_client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    # Create a project
+    project = await crud.project.create(db=db_session, obj_in=schemas.ProjectCreate(
+        name="LLM Discover LM Studio",
+        owner="owner@example.com",
+        tags=["llm"],
+    ))
+
+    # Create LM Studio provider with explicit base URL
+    provider = LLMProvider(kind=LLMProviderKind.LMSTUDIO, name="lmstudio-admin", base_url="http://localhost:1234", is_enabled=True)
+    db_session.add(provider)
+    await db_session.commit()
+
+    # Monkeypatch httpx.AsyncClient
+    import httpx
+    monkeypatch.setattr(httpx, "AsyncClient", DummyAsyncClient)
+
+    resp = await async_client.post(f"/api/v1/admin/llm/providers/{provider.id}:discover-models", params={"project_id": str(project.id)})
+    assert resp.status_code == 200
+    data = resp.json()
+    names = [m["name"] for m in data.get("models", [])]
+    assert any("Mixtral" in n or "mixtral" in n for n in names)
+    assert data.get("added_count", 0) >= 1

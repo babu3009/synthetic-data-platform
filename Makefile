@@ -73,6 +73,27 @@ frontend-test: ## Run frontend tests
 	@echo "$(YELLOW)Running frontend tests...$(NC)"
 	cd $(FRONTEND_DIR) && pnpm test
 
+backend-coverage: ## Run backend tests with coverage (threshold enforced via flag)
+	@echo "$(YELLOW)Running backend coverage...$(NC)"
+	cd $(BACKEND_DIR) && poetry run pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+
+frontend-coverage: ## Run frontend tests with coverage (Vitest)
+	@echo "$(YELLOW)Running frontend coverage...$(NC)"
+	cd $(FRONTEND_DIR) && pnpm coverage
+
+coverage-all: backend-coverage frontend-coverage ## Run coverage for both backend and frontend
+	@echo "$(GREEN)Combined coverage completed (backend + frontend).$(NC)"
+
+backend-test-notify: ## Run backend tests with PowerShell notification wrapper
+	@echo "$(YELLOW)Running backend tests with notification...$(NC)"
+	pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/run_backend_tests_notify.ps1
+
+backend-test-docker: ## Build a test image and run backend tests inside Docker
+	@echo "$(YELLOW)Building backend test image...$(NC)"
+	docker build -f $(BACKEND_DIR)/Dockerfile.test -t synthetic-data-platform/backend-test $(BACKEND_DIR)
+	@echo "$(YELLOW)Running backend tests in Docker...$(NC)"
+	docker run --rm synthetic-data-platform/backend-test
+
 # Code quality commands
 lint: backend-lint frontend-lint ## Run all linters
 
@@ -100,6 +121,11 @@ type-check: ## Run type checking
 	@echo "$(YELLOW)Running type checking...$(NC)"
 	cd $(BACKEND_DIR) && poetry run mypy .
 	cd $(FRONTEND_DIR) && pnpm type-check
+
+# PowerShell utilities
+ps-test: ## Run Pester tests for PowerShell tools
+	@echo "$(YELLOW)Running Pester tests...$(NC)"
+	pwsh -NoLogo -NoProfile -Command "Invoke-Pester -Path './testing/pwsh' -CI"
 
 # Database commands
 migrate: ## Run database migrations
@@ -167,3 +193,5 @@ setup-hooks: ## Setup pre-commit hooks
 	@echo "$(GREEN)Pre-commit hooks installed!$(NC)"
 
 .PHONY: help dev backend-setup frontend-setup backend-dev backend-dev-bg frontend-dev infra-up infra-down infra-logs test backend-test frontend-test lint backend-lint frontend-lint fmt backend-fmt frontend-fmt type-check migrate migrate-create seed db-reset build build-backend build-frontend clean shell-backend shell-db logs-backend setup-hooks
+.PHONY: backend-coverage frontend-coverage coverage-all
+.PHONY: ps-test

@@ -64,6 +64,7 @@ make infra-down       # Stop infrastructure services
 # Testing
 make test             # Run all tests
 make backend-test     # Run backend tests
+make backend-test-notify # Run backend tests with Windows/console notification on completion
 make frontend-test    # Run frontend tests
 
 # Code Quality
@@ -75,6 +76,64 @@ make type-check       # Run type checking
 make migrate          # Run database migrations
 make seed             # Seed database with sample data
 ```
+
+## Testing
+
+### Backend (Conda/Poetry)
+
+Run tests directly (ensure your Conda env or Poetry shell is active):
+
+```powershell
+# From repo root
+cd apps/backend
+pytest -q
+```
+
+With audible/toast notification when finished:
+
+```powershell
+# From repo root
+make backend-test-notify
+# or
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_backend_tests_notify.ps1
+```
+
+Notes:
+- The notify script tries to activate `conda-synthetic-data` automatically. You can override parameters (CondaPath/EnvName) if needed.
+- If you have the BurntToast PowerShell module installed, you’ll see a Windows toast; otherwise, the script beeps and prints a summary.
+
+### Frontend
+
+```powershell
+make frontend-test
+```
+
+### Docker (planned)
+
+Docker backend test target is now available:
+
+```powershell
+make backend-test-docker
+```
+
+See `TESTING.md` for mounting source and advanced usage.
+
+### Converter & Progress Utilities
+
+PowerShell progress + transcript logging utilities live in `scripts/ProgressTools/ProgressTools.psm1`.
+
+Example: convert test adapter files with visible progress bars and a saved log transcript:
+
+```powershell
+pwsh ./scripts/Invoke-TestAdapterConverter.ps1 -InputDirectory ./testing/adapters -OutputDirectory ./testing/converted
+```
+
+Artifacts:
+- Logs are written under `artifacts/logs/<timestamp>-test-adapter-converter.log`.
+- Converted files (non-dry-run) are placed in the provided output directory with `.converted.json` suffix.
+
+Use `-DryRun` to validate/parse without writing outputs.
+
 
 ## Services
 
@@ -189,3 +248,15 @@ make seed             # Seed database with sample data
    (types include `relational` and `flat`).
 
 If Prometheus/Grafana are configured, the Admin page will link directly to dashboards.
+
+## LLM Administration & Discovery
+
+Administrative endpoints for managing LLM providers, credentials, probing connectivity, and discovering models live under `POST /api/v1/admin/llm/...` and require an OWNER role plus `project_id` query parameter. Typical flow:
+
+1. Create provider (kind: openai | anthropic | ollama | lmstudio | custom).
+2. Upsert credentials (if remote provider).
+3. Probe connectivity (`:probe`).
+4. Discover models (`:discover-models`) to populate catalog (auto-assigns default if none).
+5. Set project LLM settings to enable inference and provider-assisted suggestions.
+
+See `docs/LLM_DISCOVERY.md` for detailed curl examples, troubleshooting, audit events, and behavior notes.

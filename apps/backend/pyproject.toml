@@ -103,3 +103,6 @@ addopts = "-ra -q"
 # addopts = "-ra -q --cov=app --cov-report=term-missing"  # Disabled: pytest-cov not installed
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "e2e: end-to-end tests that may require external services (skip or isolate in CI)",
+]

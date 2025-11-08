@@ -40,17 +40,63 @@ export default function LlmSettingsPage() {
   const [modelId, setModelId] = React.useState<string | undefined>()
   const [showAdvanced, setShowAdvanced] = React.useState(false)
   const [testOpen, setTestOpen] = React.useState(false)
+  // Local shadow state for advanced numeric params so inputs are properly controlled for test updates
+  const [advParams, setAdvParams] = React.useState<{ temperature: number | '' ; top_p: number | '' ; max_tokens: number | '' }>({
+    temperature: settingsQ.data?.temperature ?? '',
+    top_p: settingsQ.data?.top_p ?? '',
+    max_tokens: settingsQ.data?.max_tokens ?? '',
+  })
+  // Local shadow state for guardrails switches for incremental updates
+  const [guardrails, setGuardrails] = React.useState<{ block_pii: boolean ; allow_tool_use: boolean }>({
+    block_pii: !!settingsQ.data?.guardrails?.block_pii,
+    allow_tool_use: !!settingsQ.data?.guardrails?.allow_tool_use,
+  })
 
   const modelsQ = useLlmModels(projectId, providerId || '')
   const inferMut = useInferProviders(projectId)
 
-  // Initialize selects when settings load
+  // Primitive snapshots to drive initialization without depending on object identity
+  const depProviderId = settingsQ.data?.provider_id || undefined
+  const depModelId = settingsQ.data?.model_id || undefined
+  const depTemp = settingsQ.data?.temperature ?? ''
+  const depTopP = settingsQ.data?.top_p ?? ''
+  const depMaxTokens = settingsQ.data?.max_tokens ?? ''
+  const depBlockPii = !!settingsQ.data?.guardrails?.block_pii
+  const depAllowToolUse = !!settingsQ.data?.guardrails?.allow_tool_use
+
+  // Initialize selects when settings load; avoid infinite loops when data object identity changes by
+  // depending only on primitive fields and updating state only when values differ.
   React.useEffect(() => {
-    if (settingsQ.data) {
-      setProviderId(settingsQ.data.provider_id || undefined)
-      setModelId(settingsQ.data.model_id || undefined)
+    const nextProvider = depProviderId
+    const nextModel = depModelId
+    const nextAdv = {
+      temperature: depTemp,
+      top_p: depTopP,
+      max_tokens: depMaxTokens,
     }
-  }, [settingsQ.data])
+    const nextGuard = {
+      block_pii: depBlockPii,
+      allow_tool_use: depAllowToolUse,
+    }
+    setProviderId((prev) => (prev !== nextProvider ? nextProvider : prev))
+    setModelId((prev) => (prev !== nextModel ? nextModel : prev))
+    setAdvParams((prev) => (
+      prev.temperature !== nextAdv.temperature || prev.top_p !== nextAdv.top_p || prev.max_tokens !== nextAdv.max_tokens
+        ? nextAdv
+        : prev
+    ))
+    setGuardrails((prev) => (
+      prev.block_pii !== nextGuard.block_pii || prev.allow_tool_use !== nextGuard.allow_tool_use ? nextGuard : prev
+    ))
+  }, [
+    depProviderId,
+    depModelId,
+    depTemp,
+    depTopP,
+    depMaxTokens,
+    depBlockPii,
+    depAllowToolUse,
+  ])
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -131,38 +177,68 @@ export default function LlmSettingsPage() {
                 <div className="mt-3">
                   <Row className="g-3">
                     <Col md={4}>
-                      <Form.Label>Temperature</Form.Label>
+                      <Form.Label htmlFor="llm-temperature">Temperature</Form.Label>
                       <Form.Control
+                        id="llm-temperature"
+                        aria-label="Temperature"
                         type="number"
                         step="0.01"
                         min={0}
                         max={2}
-                        value={settingsQ.data.temperature ?? ''}
+                        value={advParams.temperature}
                         disabled={!canEdit}
-                        onChange={(e) => settingsQ.data && saveMut.mutate({ ...settingsQ.data, temperature: parseFloat(e.target.value) })}
+                        onChange={(e) => {
+                          if (!settingsQ.data) return
+                          const val = parseFloat(e.target.value)
+                          setAdvParams(p => {
+                            const next = { ...p, temperature: val }
+                            saveMut.mutate({ ...settingsQ.data, temperature: next.temperature as number, top_p: next.top_p as number, max_tokens: next.max_tokens as number })
+                            return next
+                          })
+                        }}
                       />
                     </Col>
                     <Col md={4}>
-                      <Form.Label>Top P</Form.Label>
+                      <Form.Label htmlFor="llm-top-p">Top P</Form.Label>
                       <Form.Control
+                        id="llm-top-p"
+                        aria-label="Top P"
                         type="number"
                         step="0.01"
                         min={0}
                         max={1}
-                        value={settingsQ.data.top_p ?? ''}
+                        value={advParams.top_p}
                         disabled={!canEdit}
-                        onChange={(e) => settingsQ.data && saveMut.mutate({ ...settingsQ.data, top_p: parseFloat(e.target.value) })}
+                        onChange={(e) => {
+                          if (!settingsQ.data) return
+                          const val = parseFloat(e.target.value)
+                          setAdvParams(p => {
+                            const next = { ...p, top_p: val }
+                            saveMut.mutate({ ...settingsQ.data, temperature: next.temperature as number, top_p: next.top_p as number, max_tokens: next.max_tokens as number })
+                            return next
+                          })
+                        }}
                       />
                     </Col>
                     <Col md={4}>
-                      <Form.Label>Max Tokens</Form.Label>
+                      <Form.Label htmlFor="llm-max-tokens">Max Tokens</Form.Label>
                       <Form.Control
+                        id="llm-max-tokens"
+                        aria-label="Max Tokens"
                         type="number"
                         min={16}
                         max={8192}
-                        value={settingsQ.data.max_tokens ?? ''}
+                        value={advParams.max_tokens}
                         disabled={!canEdit}
-                        onChange={(e) => settingsQ.data && saveMut.mutate({ ...settingsQ.data, max_tokens: parseInt(e.target.value) })}
+                        onChange={(e) => {
+                          if (!settingsQ.data) return
+                          const val = parseInt(e.target.value)
+                          setAdvParams(p => {
+                            const next = { ...p, max_tokens: val }
+                            saveMut.mutate({ ...settingsQ.data, temperature: next.temperature as number, top_p: next.top_p as number, max_tokens: next.max_tokens as number })
+                            return next
+                          })
+                        }}
                       />
                     </Col>
                   </Row>
@@ -171,19 +247,35 @@ export default function LlmSettingsPage() {
                     <Col md={6}>
                       <Form.Check
                         type="switch"
+                        id="guardrails-block-pii"
                         label="Block PII in prompts"
-                        checked={!!settingsQ.data.guardrails?.block_pii}
+                        checked={guardrails.block_pii}
                         disabled={!canEdit}
-                        onChange={(e) => settingsQ.data && saveMut.mutate({ ...settingsQ.data, guardrails: { ...settingsQ.data.guardrails, block_pii: e.target.checked } })}
+                        onChange={(e) => {
+                          if (!settingsQ.data) return
+                          setGuardrails(g => {
+                            const next = { ...g, block_pii: e.target.checked }
+                            saveMut.mutate({ ...settingsQ.data, guardrails: { block_pii: next.block_pii, allow_tool_use: next.allow_tool_use } })
+                            return next
+                          })
+                        }}
                       />
                     </Col>
                     <Col md={6}>
                       <Form.Check
                         type="switch"
+                        id="guardrails-allow-tool-use"
                         label="Allow Tool Use"
-                        checked={!!settingsQ.data.guardrails?.allow_tool_use}
+                        checked={guardrails.allow_tool_use}
                         disabled={!canEdit}
-                        onChange={(e) => settingsQ.data && saveMut.mutate({ ...settingsQ.data, guardrails: { ...settingsQ.data.guardrails, allow_tool_use: e.target.checked } })}
+                        onChange={(e) => {
+                          if (!settingsQ.data) return
+                          setGuardrails(g => {
+                            const next = { ...g, allow_tool_use: e.target.checked }
+                            saveMut.mutate({ ...settingsQ.data, guardrails: { block_pii: next.block_pii, allow_tool_use: next.allow_tool_use } })
+                            return next
+                          })
+                        }}
                       />
                     </Col>
                   </Row>

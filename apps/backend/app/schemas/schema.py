@@ -54,15 +54,23 @@ class CanonicalSchema(BaseModel):
 
 
 class SchemaResponse(BaseModel):
-    """API response for schema retrieval."""
+    """API response for schema retrieval.
+
+    Note: The field name "schema" conflicts with a BaseModel attribute in Pydantic.
+    To avoid shadowing warnings while preserving the public API shape, we use an
+    internal name and expose "schema" via field aliases.
+    """
     id: UUID = Field(..., description="Schema ID")
     source_id: UUID = Field(..., description="Associated source ID")
-    schema: CanonicalSchema = Field(..., description="Parsed schema definition")
+    # Use an internal name and alias it to "schema" for serialization/deserialization
+    canonical_schema: CanonicalSchema = Field(
+        ..., description="Parsed schema definition", alias="schema", serialization_alias="schema"
+    )
     dag: DAGSchema = Field(..., description="Table dependency graph")
     warnings: List[str] = Field(default_factory=list, description="Parsing warnings")
     created_at: datetime = Field(..., description="Schema creation timestamp")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class SourceUploadResponse(BaseModel):

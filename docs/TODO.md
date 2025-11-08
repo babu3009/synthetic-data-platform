@@ -1,5 +1,7 @@
 # Project TODOs
 
+> Note: The root-level `TODO.md` is now the single source of truth for open work. This file remains for historical context; please update the root `TODO.md` when adding or completing tasks.
+
 This document captures planned enhancements, grouped by area, to pick up after the current instructions are complete.
 
 ## Frontend
