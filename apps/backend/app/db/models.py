@@ -199,6 +199,8 @@ class AuditEvent(Base):
     __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # New optional user actor reference (auth flow)
+    actor_user_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     actor = Column(String(255), nullable=False, index=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=True, index=True)
     action = Column(String(255), nullable=False, index=True)
@@ -229,6 +231,55 @@ class ProjectMember(Base):
     # Relationships
     project = relationship("Project")
 
+# ---------------- Auth & Onboarding Models ---------------- #
+
+class UserRole(str, enum.Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+
+
+class UserStatus(str, enum.Enum):
+    PENDING_EMAIL_VERIFICATION = "PENDING_EMAIL_VERIFICATION"
+    PENDING_ADMIN_APPROVAL = "PENDING_ADMIN_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(320), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    organization = Column(String(255), nullable=True)
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER, index=True)
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING_EMAIL_VERIFICATION, index=True)
+    profile_image_url = Column(String(1024), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class EmailOTPPurpose(str, enum.Enum):
+    EMAIL_VERIFY = "email_verify"
+    FORGOT_PWD = "forgot_pwd"
+    CHANGE_PWD = "change_pwd"
+
+
+class EmailOTP(Base):
+    __tablename__ = "email_otps"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.users.id"), nullable=False, index=True)
+    purpose = Column(Enum(EmailOTPPurpose), nullable=False, index=True)
+    otp_hash = Column(String(128), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 
 # ---------------- LLM Models ---------------- #
 
@@ -246,7 +297,8 @@ class LLMProvider(Base):
     __table_args__ = {"schema": SCHEMA_NAME}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    kind = Column(Enum(LLMProviderKind), nullable=False, index=True)
+    # Align enum type name with migrations to avoid driver cast issues
+    kind = Column(Enum(LLMProviderKind, name="llm_provider_kind"), nullable=False, index=True)
     name = Column(String(255), nullable=False, unique=True, index=True)
     base_url = Column(String(1024), nullable=True)
     is_enabled = Column(Boolean, nullable=False, default=True)

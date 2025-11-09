@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Database schema (and optional testing schema)
     DB_SCHEMA: str = "synthetic_data"
     TESTING_DB_SCHEMA: Optional[str] = None
+    # Toggle to force using testing schema even outside pytest
+    USE_TESTING_SCHEMA: bool = False
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:
@@ -70,6 +72,22 @@ class Settings(BaseSettings):
 
     # JWT settings
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    # Auth & onboarding additions
+    AUTH_JWT_SECRET: str = "change_me"  # HS256 signing secret (do not log)
+    EMAIL_OTP_TTL_HOURS: int = 24
+    FORGOT_PWD_OTP_TTL_HOURS: int = 24
+    OTP_MAX_ATTEMPTS: int = 5
+    OTP_RESEND_RATE_PER_HOUR: int = 3
+    ADMIN_EMAIL: str = "admin@example.com"
+    ADMIN_PASSWORD: str = "Strong#Admin#Secret123"
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASS: Optional[str] = None
+    SMTP_FROM: str = "Synthetic Data App <no-reply@example.com>"
+    AVATAR_MAX_MB: int = 2
+    ALLOWED_AUTO_APPROVE_DOMAINS: str = "tarento.com,ivolve.ai"
+    PASSWORD_POLICY_MIN_LENGTH: int = 10
     
     # OIDC (optional; leave unset to disable)
     OIDC_ISSUER: Optional[str] = None

@@ -16,21 +16,36 @@ down_revision = 'b2a64fae9506'
 branch_labels = None
 depends_on = None
 
-SCHEMA = 'synthetic_data'
+from app.db.base import SCHEMA_NAME as SCHEMA  # dynamic schema resolution
 
-
-provider_kind_enum = sa.Enum('openai', 'anthropic', 'ollama', 'lmstudio', 'custom', name='llm_provider_kind')
+# We'll avoid binding the Enum directly to the column during table creation to prevent auto CREATE TYPE
+ENUM_NAME = 'llm_provider_kind'
+ENUM_VALUES = ("openai", "anthropic", "ollama", "lmstudio", "custom")
 
 
 def upgrade() -> None:
-    # Create enum type first (PostgreSQL)
-    provider_kind_enum.create(op.get_bind(), checkfirst=True)
+    # Ensure the enum type exists using a guarded DO block (works even without IF NOT EXISTS)
+    op.execute(
+        sa.text(
+            """
+            DO $$
+            BEGIN
+                BEGIN
+                    CREATE TYPE llm_provider_kind AS ENUM ('openai','anthropic','ollama','lmstudio','custom');
+                EXCEPTION WHEN duplicate_object THEN
+                    NULL;
+                END;
+            END$$;
+            """
+        )
+    )
 
     # llm_providers
     op.create_table(
         'llm_providers',
         sa.Column('id', sa.UUID(as_uuid=True), nullable=False),
-        sa.Column('kind', provider_kind_enum, nullable=False),
+        # Create as VARCHAR first; we will ALTER to enum after table creation
+        sa.Column('kind', sa.String(length=50), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('base_url', sa.String(length=1024), nullable=True),
         sa.Column('is_enabled', sa.Boolean(), nullable=False, server_default=sa.text('true')),
@@ -41,6 +56,13 @@ def upgrade() -> None:
     )
     op.create_index('ix_llm_providers_kind', 'llm_providers', ['kind'], unique=False, schema=SCHEMA)
     op.create_index('uq_llm_providers_name', 'llm_providers', ['name'], unique=True, schema=SCHEMA)
+
+    # Convert kind column to enum type (now that type exists)
+    op.execute(
+        sa.text(
+            f"ALTER TABLE {SCHEMA}.llm_providers ALTER COLUMN kind TYPE {ENUM_NAME} USING kind::{ENUM_NAME}"
+        )
+    )
 
     # llm_credentials
     op.create_table(
@@ -111,5 +133,6 @@ def downgrade() -> None:
     op.drop_index('ix_llm_providers_kind', table_name='llm_providers', schema=SCHEMA)
     op.drop_table('llm_providers', schema=SCHEMA)
 
-    # Drop enum type
-    provider_kind_enum.drop(op.get_bind(), checkfirst=True)
+    # Drop enum type only if exists (safe)
+    # Leave enum type in place (shared); do not drop to avoid impacting other schemas
+    return

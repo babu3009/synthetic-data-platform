@@ -1,4 +1,4 @@
-"""Add synthetic_data schema and all models
+"""Add schema and all models (schema resolved at runtime)
 
 Revision ID: 001_initial
 Revises: 
@@ -9,6 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 import uuid
+from app.db.base import SCHEMA_NAME  # dynamic target schema
 
 # revision identifiers, used by Alembic.
 revision = '001_initial'
@@ -19,7 +20,7 @@ depends_on = None
 
 def upgrade() -> None:
     # Create schema
-    op.execute('CREATE SCHEMA IF NOT EXISTS synthetic_data')
+    op.execute(f'CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}')
     
     # Create projects table
     op.create_table('projects',
@@ -32,10 +33,10 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_projects_name'), 'projects', ['name'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_projects_owner'), 'projects', ['owner'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_projects_name'), 'projects', ['name'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_projects_owner'), 'projects', ['owner'], unique=False, schema=SCHEMA_NAME)
 
     # Create sources table
     op.create_table('sources',
@@ -47,12 +48,12 @@ def upgrade() -> None:
     sa.Column('schema_info', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['synthetic_data.projects.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['project_id'], [f'{SCHEMA_NAME}.projects.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_sources_kind'), 'sources', ['kind'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_sources_project_id'), 'sources', ['project_id'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_sources_kind'), 'sources', ['kind'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_sources_project_id'), 'sources', ['project_id'], unique=False, schema=SCHEMA_NAME)
 
     # Create requests table
     op.create_table('requests',
@@ -68,13 +69,13 @@ def upgrade() -> None:
     sa.Column('error_message', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['synthetic_data.projects.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['project_id'], [f'{SCHEMA_NAME}.projects.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_requests_project_id'), 'requests', ['project_id'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_requests_status'), 'requests', ['status'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_requests_type'), 'requests', ['type'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_requests_project_id'), 'requests', ['project_id'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_requests_status'), 'requests', ['status'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_requests_type'), 'requests', ['type'], unique=False, schema=SCHEMA_NAME)
 
     # Create configs table
     op.create_table('configs',
@@ -86,11 +87,11 @@ def upgrade() -> None:
     sa.Column('generation_strategy', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['request_id'], ['synthetic_data.requests.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['request_id'], [f'{SCHEMA_NAME}.requests.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_configs_request_id'), 'configs', ['request_id'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_configs_request_id'), 'configs', ['request_id'], unique=False, schema=SCHEMA_NAME)
 
     # Create artifacts table
     op.create_table('artifacts',
@@ -103,12 +104,12 @@ def upgrade() -> None:
     sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['request_id'], ['synthetic_data.requests.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['request_id'], [f'{SCHEMA_NAME}.requests.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_artifacts_format'), 'artifacts', ['format'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_artifacts_request_id'), 'artifacts', ['request_id'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_artifacts_format'), 'artifacts', ['format'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_artifacts_request_id'), 'artifacts', ['request_id'], unique=False, schema=SCHEMA_NAME)
 
     # Create api_keys table
     op.create_table('api_keys',
@@ -122,12 +123,12 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), server_default=sa.text('true'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['synthetic_data.projects.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['project_id'], [f'{SCHEMA_NAME}.projects.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_api_keys_hashed_key'), 'api_keys', ['hashed_key'], unique=True, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_api_keys_project_id'), 'api_keys', ['project_id'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_api_keys_hashed_key'), 'api_keys', ['hashed_key'], unique=True, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_api_keys_project_id'), 'api_keys', ['project_id'], unique=False, schema=SCHEMA_NAME)
 
     # Create audit_events table
     op.create_table('audit_events',
@@ -139,45 +140,45 @@ def upgrade() -> None:
     sa.Column('ip_address', sa.String(length=45), nullable=True),
     sa.Column('user_agent', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['synthetic_data.projects.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['project_id'], [f'{SCHEMA_NAME}.projects.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id'),
-    schema='synthetic_data'
+    schema=SCHEMA_NAME
     )
-    op.create_index(op.f('ix_synthetic_data_audit_events_action'), 'audit_events', ['action'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_audit_events_actor'), 'audit_events', ['actor'], unique=False, schema='synthetic_data')
-    op.create_index(op.f('ix_synthetic_data_audit_events_project_id'), 'audit_events', ['project_id'], unique=False, schema='synthetic_data')
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_action'), 'audit_events', ['action'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_actor'), 'audit_events', ['actor'], unique=False, schema=SCHEMA_NAME)
+    op.create_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_project_id'), 'audit_events', ['project_id'], unique=False, schema=SCHEMA_NAME)
 
 
 def downgrade() -> None:
     # Drop all tables
-    op.drop_index(op.f('ix_synthetic_data_audit_events_project_id'), table_name='audit_events', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_audit_events_actor'), table_name='audit_events', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_audit_events_action'), table_name='audit_events', schema='synthetic_data')
-    op.drop_table('audit_events', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_project_id'), table_name='audit_events', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_actor'), table_name='audit_events', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_audit_events_action'), table_name='audit_events', schema=SCHEMA_NAME)
+    op.drop_table('audit_events', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_api_keys_project_id'), table_name='api_keys', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_api_keys_hashed_key'), table_name='api_keys', schema='synthetic_data')
-    op.drop_table('api_keys', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_api_keys_project_id'), table_name='api_keys', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_api_keys_hashed_key'), table_name='api_keys', schema=SCHEMA_NAME)
+    op.drop_table('api_keys', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_artifacts_request_id'), table_name='artifacts', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_artifacts_format'), table_name='artifacts', schema='synthetic_data')
-    op.drop_table('artifacts', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_artifacts_request_id'), table_name='artifacts', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_artifacts_format'), table_name='artifacts', schema=SCHEMA_NAME)
+    op.drop_table('artifacts', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_configs_request_id'), table_name='configs', schema='synthetic_data')
-    op.drop_table('configs', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_configs_request_id'), table_name='configs', schema=SCHEMA_NAME)
+    op.drop_table('configs', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_requests_type'), table_name='requests', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_requests_status'), table_name='requests', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_requests_project_id'), table_name='requests', schema='synthetic_data')
-    op.drop_table('requests', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_requests_type'), table_name='requests', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_requests_status'), table_name='requests', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_requests_project_id'), table_name='requests', schema=SCHEMA_NAME)
+    op.drop_table('requests', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_sources_project_id'), table_name='sources', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_sources_kind'), table_name='sources', schema='synthetic_data')
-    op.drop_table('sources', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_sources_project_id'), table_name='sources', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_sources_kind'), table_name='sources', schema=SCHEMA_NAME)
+    op.drop_table('sources', schema=SCHEMA_NAME)
     
-    op.drop_index(op.f('ix_synthetic_data_projects_owner'), table_name='projects', schema='synthetic_data')
-    op.drop_index(op.f('ix_synthetic_data_projects_name'), table_name='projects', schema='synthetic_data')
-    op.drop_table('projects', schema='synthetic_data')
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_projects_owner'), table_name='projects', schema=SCHEMA_NAME)
+    op.drop_index(op.f(f'ix_{SCHEMA_NAME}_projects_name'), table_name='projects', schema=SCHEMA_NAME)
+    op.drop_table('projects', schema=SCHEMA_NAME)
     
     # Drop schema
-    op.execute('DROP SCHEMA IF EXISTS synthetic_data CASCADE')
+    op.execute(f'DROP SCHEMA IF EXISTS {SCHEMA_NAME} CASCADE')

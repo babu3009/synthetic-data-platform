@@ -3,6 +3,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -22,6 +23,28 @@ async def lifespan(app: FastAPI):  # pragma: no cover - integration path
         _cleanup_task = asyncio.create_task(_run_cleanup_periodically(interval_minutes))
     except Exception:
         _cleanup_task = None
+    # Seed admin if missing
+    try:
+        from app.db.session import AsyncSessionLocal
+        from app.db.models import User, UserRole, UserStatus
+        from app.security.passwords import hash_password
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(select(User).where(User.email == settings.ADMIN_EMAIL.lower()))
+            admin = res.scalar_one_or_none()
+            if not admin:
+                admin = User(
+                    email=settings.ADMIN_EMAIL.lower(),
+                    password_hash=hash_password(settings.ADMIN_PASSWORD),
+                    role=UserRole.ADMIN,
+                    status=UserStatus.APPROVED,
+                    organization="admin",
+                )
+                db.add(admin)
+                await db.commit()
+    except Exception:
+        # best effort seeding only
+        pass
     # Yield control to application
     try:
         yield
@@ -54,6 +77,8 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+# Static serving for uploaded avatars
+app.mount("/storage/uploads/avatars", StaticFiles(directory="storage/uploads/avatars"), name="avatars")
 
 # Observability (Prometheus /metrics and OpenTelemetry tracing if configured)
 init_observability(app)

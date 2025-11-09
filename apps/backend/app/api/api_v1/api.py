@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import artifacts, health, projects, requests, sources, flat, validate, webhooks, api_keys, auth, infer, llm_admin, llm_settings
+from app.api.api_v1.endpoints import artifacts, health, projects, requests, sources, flat, validate, webhooks, api_keys, auth, infer, llm_admin, llm_settings, users, admin_users
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
@@ -20,6 +20,8 @@ api_router.include_router(flat.req_router, prefix="/requests", tags=["requests"]
 api_router.include_router(validate.router, tags=["validate"])  # /api/v1/validate
 api_router.include_router(webhooks.router, tags=["webhooks"])  # /api/v1/webhooks/run-status
 api_router.include_router(auth.router, tags=["auth"])  # /api/v1/auth/login, /auth/callback
+api_router.include_router(users.router, tags=["Users"])  # /api/v1/users/me, avatar
+api_router.include_router(admin_users.router, tags=["Admin"])  # /api/v1/admin/users
 api_router.include_router(infer.router, prefix="/projects/{project_id}/infer", tags=["infer"])
 api_router.include_router(infer.root_router, prefix="/infer", tags=["infer"])  # alias
 api_router.include_router(llm_admin.router, prefix="/admin/llm", tags=["admin-llm"])  # requires project_id query param & OWNER role
