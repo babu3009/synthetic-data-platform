@@ -13,7 +13,8 @@ export const api = axios.create({
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token')
+    // Support both legacy 'access_token' and new 'authToken'
+    const token = localStorage.getItem('authToken') || localStorage.getItem('access_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -29,9 +30,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access
+      // Handle unauthorized access - clear both token variants
       localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      localStorage.removeItem('authToken')
+      // Avoid infinite loops if already on login
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

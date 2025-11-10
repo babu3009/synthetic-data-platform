@@ -3,13 +3,28 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import HomePage from './pages/home_page'
+import LoginPage from './pages/auth/login_page'
+import RegisterPage from './pages/auth/register_page'
+import VerifyEmailPage from './pages/auth/verify_email_page'
+import ForgotPasswordPage from './pages/auth/forgot_password_page'
+import ResetPasswordPage from './pages/auth/reset_password_page'
+import ChangePasswordPage from './pages/auth/change_password_page'
+import ProfilePage from './pages/profile_page'
 import WizardPage from './pages/wizard_page'
 import RequestDetailPage from './pages/request_detail_page'
 import LlmSettingsPage from './pages/llm_settings_page'
 import LlmProvidersPage from './pages/admin/llm_providers_page'
+import ProjectsListPage from './pages/projects/projects_list_page'
+import ProjectCreatePage from './pages/projects/project_create_page'
+import ProjectDetailPage from './pages/projects/project_detail_page'
+import AdminUsersPage from './pages/admin/admin_users_page'
 import AppNavbar from './components/app_navbar'
+import RequireAuth from './components/require_auth'
 import 'bootstrap/dist/css/bootstrap.min.css'
+import { AuthProvider } from './state/auth_context'
 import './index.css'
+import { ToastProvider } from './state/toast_context'
+import ErrorBoundary from './components/error_boundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,18 +45,35 @@ if (rootEl) {
       <QueryClientProvider client={queryClient}>
         {/* Opt-in to React Router v7 future flags for smoother upgrade path */}
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AppNavbar />
-          <main className="container-fluid px-0">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/wizard" element={<WizardPage />} />
-              <Route path="/projects/:projectId/wizard" element={<WizardPage />} />
-              <Route path="/projects/:projectId/requests/:requestId" element={<RequestDetailPage />} />
-              <Route path="/projects/:projectId/llm-settings" element={<LlmSettingsPage />} />
-              <Route path="/admin/:projectId/llm-providers" element={<LlmProvidersPage />} />
-              <Route path="/admin/llm-providers" element={<LlmProvidersPage />} />
-            </Routes>
-          </main>
+          <ToastProvider>
+            <AuthProvider>
+              <ErrorBoundary>
+                <AppNavbar />
+                <main className="container-fluid px-0">
+                  <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
+                <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+                <Route path="/" element={<RequireAuth><HomePage /></RequireAuth>} />
+                <Route path="/projects" element={<RequireAuth><ProjectsListPage /></RequireAuth>} />
+                <Route path="/projects/new" element={<RequireAuth><ProjectCreatePage /></RequireAuth>} />
+                <Route path="/projects/:id" element={<RequireAuth><ProjectDetailPage /></RequireAuth>} />
+                <Route path="/wizard" element={<RequireAuth><WizardPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/wizard" element={<RequireAuth><WizardPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/requests/:requestId" element={<RequireAuth><RequestDetailPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/llm-settings" element={<RequireAuth><LlmSettingsPage /></RequireAuth>} />
+                <Route path="/admin/:projectId/llm-providers" element={<RequireAuth><LlmProvidersPage /></RequireAuth>} />
+                <Route path="/admin/llm-providers" element={<RequireAuth><LlmProvidersPage /></RequireAuth>} />
+                <Route path="/admin/users" element={<RequireAuth><AdminUsersPage /></RequireAuth>} />
+                  </Routes>
+                </main>
+              </ErrorBoundary>
+            </AuthProvider>
+          </ToastProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </React.StrictMode>,

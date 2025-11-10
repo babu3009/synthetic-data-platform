@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppNavbar } from '../components/app_navbar'
+import { AuthContext, type AuthContextValue } from '../state/auth_context_public'
+import { ToastProvider } from '../state/toast_context'
 
 vi.mock('../hooks/use_projects', () => {
   return {
@@ -21,12 +23,22 @@ vi.mock('../hooks/use_projects', () => {
 
 function renderNavbar(path = '/') {
   const qc = new QueryClient()
+  const authValue: AuthContextValue = {
+    token: 't',
+    loading: false,
+    role: 'OWNER',
+    login: async () => {},
+    logout: () => {},
+  }
   return render(
     <QueryClientProvider client={qc}>
-      {/* Remove future flags to reduce transition-related test warnings */}
-      <MemoryRouter initialEntries={[path]}>
-        <AppNavbar />
-      </MemoryRouter>
+      <AuthContext.Provider value={authValue}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppNavbar />
+          </MemoryRouter>
+        </ToastProvider>
+      </AuthContext.Provider>
     </QueryClientProvider>
   )
 }
@@ -46,7 +58,7 @@ describe('Navbar project selector', () => {
   const select = screen.getByLabelText(/Project select/i) as HTMLSelectElement
   await act(async () => { await user.selectOptions(select, 'p2') })
 
-    const go = await screen.findByRole('button', { name: /Go/i })
+    const go = await screen.findByRole('button', { name: /^Go$/i })
   await act(async () => { await user.click(go) })
 
     // Wait for navigation; MemoryRouter doesn't update window.location, but AppNavbar pushState triggers route change

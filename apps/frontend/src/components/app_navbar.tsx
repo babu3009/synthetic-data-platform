@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Navbar as BsNavbar, Nav, Container } from 'react-bootstrap'
+import { useAuth } from '../state/use_auth'
 import ProjectSelectorModal from './project_selector'
 
 function AppNavbar() {
@@ -25,6 +26,7 @@ function AppNavbar() {
       setShowPicker(true)
     }
   }
+  const { token, logout, role } = useAuth()
   return (
     <BsNavbar bg="dark" variant="dark" expand="lg" sticky="top">
       <Container>
@@ -35,6 +37,7 @@ function AppNavbar() {
         <BsNavbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
             <Nav.Link as={Link} to="/" active={location.pathname === '/'}>Home</Nav.Link>
+            <Nav.Link as={Link} to="/projects" active={location.pathname === '/projects'}>Projects</Nav.Link>
             <Nav.Link
               as={Link}
               to={wizardHref}
@@ -55,18 +58,37 @@ function AppNavbar() {
             >
               LLM Settings
             </Nav.Link>
-            <Nav.Link
-              as={Link}
-              to={llmProvidersHref}
-              onClick={(e) => { if (!projectId) { e.preventDefault(); handleNavigate('providers') } }}
-              active={/llm-providers$/.test(location.pathname)}
-              aria-label="LLM Providers Admin"
-            >
-              LLM Providers
-            </Nav.Link>
+            {role === 'OWNER' && (
+              <Nav.Link
+                as={Link}
+                to={llmProvidersHref}
+                onClick={(e) => { if (!projectId) { e.preventDefault(); handleNavigate('providers') } }}
+                active={/llm-providers$/.test(location.pathname)}
+                aria-label="LLM Providers Admin"
+              >
+                LLM Providers
+              </Nav.Link>
+            )}
+            {role === 'OWNER' && (
+              <Nav.Link
+                as={Link}
+                to="/admin/users"
+                active={/\/admin\/users$/.test(location.pathname)}
+                aria-label="Admin User Approval"
+              >
+                Admin Users
+              </Nav.Link>
+            )}
           </Nav>
           <Nav>
-            <Nav.Link as={Link} to="/profile" active={location.pathname === '/profile'}>Profile</Nav.Link>
+            {token ? (
+              <>
+                <Nav.Link as={Link} to="/profile" active={location.pathname === '/profile'}>Profile</Nav.Link>
+                <Nav.Link onClick={logout} aria-label="Logout">Logout</Nav.Link>
+              </>
+            ) : (
+              <Nav.Link as={Link} to="/login" active={location.pathname === '/login'}>Login</Nav.Link>
+            )}
           </Nav>
         </BsNavbar.Collapse>
       </Container>

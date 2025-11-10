@@ -6,6 +6,8 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppNavbar from '../../components/app_navbar'
 import WizardPage from '../../pages/wizard_page'
+import { AuthContext, type AuthContextValue } from '../../state/auth_context_public'
+import { ToastProvider } from '../../state/toast_context'
 
 // Mock projects hook to provide selectable projects
 vi.mock('../../hooks/use_projects', () => {
@@ -35,18 +37,29 @@ function RouteShell() {
 
 function setup(initialPath = '/') {
   const qc = new QueryClient()
+  const authValue: AuthContextValue = {
+    token: 't',
+    loading: false,
+    role: 'OWNER',
+    login: async () => {},
+    logout: () => {},
+  }
   return render(
     <QueryClientProvider client={qc}>
-  {/* Remove future flags which invoke startTransition leading to act warnings */}
-  <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/" element={<RouteShell />} />
-          <Route path="/wizard" element={<RouteShell />} />
-          <Route path="/projects/:projectId/wizard" element={<RouteShell />} />
-          <Route path="/projects/:projectId/llm-settings" element={<RouteShell />} />
-          <Route path="/admin/:projectId/llm-providers" element={<RouteShell />} />
-        </Routes>
-      </MemoryRouter>
+      <AuthContext.Provider value={authValue}>
+        <ToastProvider>
+          {/* Remove future flags which invoke startTransition leading to act warnings */}
+          <MemoryRouter initialEntries={[initialPath]}>
+            <Routes>
+              <Route path="/" element={<RouteShell />} />
+              <Route path="/wizard" element={<RouteShell />} />
+              <Route path="/projects/:projectId/wizard" element={<RouteShell />} />
+              <Route path="/projects/:projectId/llm-settings" element={<RouteShell />} />
+              <Route path="/admin/:projectId/llm-providers" element={<RouteShell />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </AuthContext.Provider>
     </QueryClientProvider>
   )
 }
@@ -66,7 +79,7 @@ describe('Project selection → wizard flow', () => {
   const select = screen.getByLabelText(/Project select/i) as HTMLSelectElement
   await act(async () => { await user.selectOptions(select, 'projB') })
 
-  const goBtn = screen.getByRole('button', { name: /Go/i })
+  const goBtn = screen.getByRole('button', { name: /^Go$/i })
   await act(async () => { await user.click(goBtn) })
 
     // Wait for wizard page to set projectId and surface in Entities page
