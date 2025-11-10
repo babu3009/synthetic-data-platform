@@ -55,7 +55,9 @@ celerybeat.pid
 # --- Environment / secrets (FastAPI/Uvicorn) ---
 .env
 .env.*
-!.env.example
+# Allow example env files anywhere in the repo
+!**/.env.example
+!**/.env.prod.example
 *.pem
 *.key
 *.crt
