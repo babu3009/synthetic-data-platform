@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app import crud, schemas
 from app.db.models import ArtifactFormat, RequestStatus, RequestType, ProjectRole
 from app.security.auth import require_project_scope, get_current_principal
-from app.services.flat import preview as preview_flat
+from app.modules.synth.service import flat_preview as service_flat_preview, start_request_job as service_start_request_job
 from app.core.config import settings
 from typing import Any, Dict, cast
 from app.core.rq import get_queue
@@ -29,11 +29,7 @@ req_router = APIRouter()
 @router.post("/preview")
 async def flat_preview(payload: Dict[str, Any]):
     """Return first 100 rows for a flat schema preview."""
-    try:
-        rows = preview_flat(payload)
-        return rows
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service_flat_preview(payload)
 
 
 @req_router.post("/{request_id}:start", response_model=schemas.Request)
@@ -45,54 +41,6 @@ async def start_request(
         raise HTTPException(status_code=404, detail="Request not found")
     # Authorization: require run:request or EDITOR/OWNER on the project
     await require_project_scope(str(req.project_id), required_scopes=["run:request"], required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
-    # Determine request type (Enum) directly from model
-    rtype = getattr(req, "type", None)
-
-    # Determine priority queue from request params (default -> "default")
-    params = req.params_json or {}
-    priority = "default"
-    if isinstance(params, dict):
-        priority = str(params.get("priority", "default")).lower()
-        if priority not in {"low", "default", "high"}:
-            priority = "default"
-
-    # Enqueue background job with RQ and metadata
-    job_id = ""
-    q = cast(Any, get_queue(priority))
-    if rtype == RequestType.FLAT:
-        job = q.enqueue(
-            run_flat_job,
-            str(request_id),
-            meta={"request_id": str(request_id)},
-            retry=Retry(max=3),
-        )
-    elif rtype == RequestType.RELATIONAL:
-        job = q.enqueue(
-            run_relational_job,
-            str(request_id),
-            meta={"request_id": str(request_id)},
-            retry=Retry(max=3),
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported request type for start")
-    job_id = job.get_id()
-
-    # Stash job id in params and keep status as PENDING (worker will set RUNNING)
-    updated_params: Dict[str, Any] = {}
-    if isinstance(params, dict):
-        updated_params = {**params}
-    updated_params["job_id"] = job_id
-    updated_params["queue"] = priority
-    await crud.request.update(db=db, db_obj=req, obj_in={"params_json": updated_params})
-
-    # Metrics: started
-    try:
-        if REQUESTS_STARTED is not None:
-            typ = "flat" if rtype == RequestType.FLAT else ("relational" if rtype == RequestType.RELATIONAL else str(rtype))
-            REQUESTS_STARTED.labels(type=typ).inc()
-    except Exception:
-        pass
-
     # Return refreshed request
-    req = await crud.request.get(db=db, id=request_id)
-    return req
+    # Pass module-level get_queue so tests can monkeypatch flat_endpoint.get_queue
+    return await service_start_request_job(db, request_id=request_id, get_queue_fn=get_queue)

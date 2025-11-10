@@ -44,6 +44,12 @@ docker run --rm -v ${PWD}/apps/backend:/app synthetic-data-platform/backend-test
 ### Pytest Marks
 - `e2e` — End-to-end tests (opt-in CI job). Skipped by default in quality pipeline via `-m "not e2e"`.
 
+### Auth flow tests (OTP specifics)
+
+- The auth test suite covers register → verify (error path), login, resend rate limiting, forgot/reset (error path), and change password (current password vs OTP).
+- OTP rows are stored hashed; tests query the latest OTP using `ORDER BY created_at DESC LIMIT 1` to avoid multi-row errors during resends.
+- To keep tests deterministic without exposing secrets, success-path OTP verification is not asserted by default. If you need full happy-path coverage, consider enabling a test-only hook that returns the plain OTP when `settings.TESTING=True` or inject a capture stub around the OTP generator.
+
 ### Backend E2E (Opt-In CI Job)
 Run locally:
 ```powershell

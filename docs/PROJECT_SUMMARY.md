@@ -14,6 +14,7 @@ synthetic-data-platform/
 │   │   │   ├── api/            # API routes and endpoints
 │   │   │   ├── core/           # Core configuration and settings
 │   │   │   ├── db/             # Database models and session
+│   │   │   ├── modules/        # Module-oriented services (auth, users, llm, synth, storage, admin)
 │   │   │   └── main.py         # FastAPI application entry point
 │   │   ├── alembic/            # Database migrations
 │   │   ├── tests/              # Backend tests
@@ -55,7 +56,7 @@ synthetic-data-platform/
 - **Cache/Queue**: Redis 7 with RQ (Redis Queue)
 - **Data Processing**: pyarrow, pandas, openpyxl
 - **Synthetic Data**: faker, mimesis
-- **Testing**: pytest + pytest-asyncio
+- **Testing**: pytest + pytest-asyncio (with OTP-aware auth tests)
 - **Code Quality**: ruff (linter), black (formatter), mypy (type checker)
 - **Server**: uvicorn ASGI server
 
@@ -223,7 +224,7 @@ The GitHub Actions pipeline automatically:
 2. **Database Schema**: Add your data models in `apps/backend/app/db/`
 3. **API Endpoints**: Implement your synthetic data generation endpoints
 4. **Frontend Components**: Build out the synthetic data wizard interface
-5. **Authentication**: OIDC scaffolding + project-scoped API keys with RBAC implemented (see `apps/backend/docs/SECURITY.md`)
+5. **Authentication**: OIDC scaffolding + project-scoped API keys with RBAC implemented (see `apps/backend/docs/SECURITY.md`). Auth flows (register/verify/resend/forgot/reset/change) are modularized under `app/modules/auth` with UUID normalization and resend rate limits (resends only).
 6. **Data Generators**: Implement synthetic data generation algorithms
 7. **File Processing**: Add support for various data formats (CSV, JSON, Parquet)
 

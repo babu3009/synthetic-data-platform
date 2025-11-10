@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
 from app.db.session import get_db
-from app.services.storage import get_storage
+from app.modules.storage.service import (
+    list_artifacts as service_list_artifacts,
+    get_artifact as service_get_artifact,
+    sign_artifact as service_sign_artifact,
+)
 from app.security.auth import require_project_scope, get_current_principal
 from app.db.models import ProjectRole
 
@@ -43,28 +47,8 @@ async def sign_artifact_url(
     request_obj = await crud.request.get(db=db, id=request_id)
     if not request_obj:
         raise HTTPException(status_code=404, detail="Request not found")
-
-    # Authorization: require read:artifacts or VIEWER+
     await require_project_scope(str(request_obj.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
-
-    artifact = await crud.artifact.get(db=db, id=artifact_id)
-    if artifact is None or getattr(artifact, "request_id", None) != request_id:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-
-    storage = get_storage()
-    uri = str(getattr(artifact, "storage_uri", ""))
-    object_name = uri
-    if uri.startswith("s3://"):
-        try:
-            object_name = uri.split("/", 3)[3]
-        except Exception:
-            object_name = uri
-    elif uri.startswith("file:"):
-        if "/requests/" in uri:
-            object_name = uri.split("/requests/")[-1]
-
-    url = storage.get_signed_url(str(object_name), expires_seconds=int(expires))
-    return {"url": url, "expires": int(expires)}
+    return await service_sign_artifact(db, request_id=request_id, artifact_id=artifact_id, expires=int(expires))
 
 
 @router.get("/{request_id}/artifacts", response_model=List[schemas.Artifact])
@@ -77,14 +61,11 @@ async def read_artifacts(
     """
     Get artifacts for a request.
     """
-    # Verify request exists
     request = await crud.request.get(db=db, id=request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     await require_project_scope(str(request.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
-    
-    artifacts = await crud.artifact.get_by_request(db, request_id=request_id)
-    return artifacts
+    return await service_list_artifacts(db, request_id=request_id)
 
 
 @router.get("/{request_id}/artifacts/{artifact_id}", response_model=schemas.Artifact)
@@ -98,13 +79,8 @@ async def read_artifact(
     """
     Get specific artifact by ID.
     """
-    # Verify request exists
     request = await crud.request.get(db=db, id=request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     await require_project_scope(str(request.project_id), required_scopes=["read:artifacts"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
-    
-    artifact = await crud.artifact.get(db=db, id=artifact_id)
-    if not artifact or artifact.request_id != request_id:
-        raise HTTPException(status_code=404, detail="Artifact not found")
-    return artifact
+    return await service_get_artifact(db, request_id=request_id, artifact_id=artifact_id)

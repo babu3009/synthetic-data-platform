@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 from app.db.session import get_db
 from app.db.models import User, UserStatus, UserRole
 from app.services.audit import audit
+from app.modules.admin import service as admin_service
 
 router = APIRouter()
 
@@ -17,30 +18,27 @@ def _require_admin(request: Request) -> str:
     claims = decode_token(auth.split()[1])
     if claims.get("role") != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Admin required")
-    return claims.get("sub")
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+    return str(sub)
 
 
 @router.get("/admin/users")
-async def list_pending(status: str = "PENDING_ADMIN_APPROVAL", request: Request = None, db: AsyncSession = Depends(get_db)):
+async def list_pending(request: Request, status: str = "PENDING_ADMIN_APPROVAL", db: AsyncSession = Depends(get_db)):
     _ = _require_admin(request)
-    res = await db.execute(select(User).where(User.status == getattr(UserStatus, status)))
-    users = res.scalars().all()
-    return [{"id": str(u.id), "email": u.email, "organization": u.organization, "status": u.status.value} for u in users]
+    resp = await admin_service.list_users(db, status=status)
+    # Preserve original response shape (list of dicts)
+    return [u.model_dump() for u in resp.users]
 
 
 @router.post("/admin/users/{user_id}/approve")
 async def approve(user_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     admin_id = _require_admin(request)
-    await db.execute(update(User).where(User.id == user_id).values(status=UserStatus.APPROVED))
-    await db.commit()
-    await audit(db, "admin.user.approve", actor_user_id=admin_id, payload={"user_id": user_id})
-    return {"status": "ok"}
+    return await admin_service.approve_user(db, admin_id=admin_id, user_id=user_id)
 
 
 @router.post("/admin/users/{user_id}/reject")
 async def reject(user_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     admin_id = _require_admin(request)
-    await db.execute(update(User).where(User.id == user_id).values(status=UserStatus.REJECTED))
-    await db.commit()
-    await audit(db, "admin.user.reject", actor_user_id=admin_id, payload={"user_id": user_id})
-    return {"status": "ok"}
+    return await admin_service.reject_user(db, admin_id=admin_id, user_id=user_id)

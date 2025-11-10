@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+"""DEPRECATED (Phase 5): legacy flat data generation implementation.
+
+This module remains for backward compatibility. New code should import
+`preview` and `generate_to_artifacts` via:
+
+    from app.modules.synth.generators.flat_generator import preview, generate_to_artifacts
+
+The logic will eventually be relocated fully under `app/modules/synth/`.
+"""
+
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import isnan
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
@@ -19,13 +29,12 @@ class ColumnStats:
     m2: float = 0.0  # sum of squares of differences from the current mean
     min: Optional[float] = None
     max: Optional[float] = None
-    cardinality: set = None  # track unique values up to a threshold
-    topk_counter: Counter = None
+    cardinality: set[Any] = field(default_factory=set)  # track unique values up to a threshold
+    topk_counter: Counter[Any] = field(default_factory=Counter)
 
     def __post_init__(self):
-        self.cardinality = set()
-        self.topk_counter = Counter()
-
+        # Fields already initialized via default_factory; keep method for future extensions
+        pass
     def add(self, v: Any):
         self.count += 1
         if v is None:

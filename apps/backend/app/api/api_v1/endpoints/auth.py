@@ -9,6 +9,7 @@ For now, we only echo the configuration pieces to demonstrate wiring.
 from urllib.parse import urlencode
 from datetime import datetime, timezone
 from typing import Optional, Any, cast
+from uuid import UUID
 
 from fastapi import APIRouter, Request, HTTPException, Depends, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     ChangePasswordRequest,
 )
+from app.modules.auth import service as auth_service  # Phase 2 service usage
 from app.security.passwords import hash_password, verify_password, validate_password_policy
 from app.security.jwt import create_access_token
 from app.services.otp import generate_otp_and_hash, verify_otp
@@ -124,40 +126,30 @@ async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail="User not found")
     if user.status in (UserStatus.APPROVED, UserStatus.PENDING_ADMIN_APPROVAL):
         return VerifyEmailResponse(status=user.status.value, message="Already verified")
-    otp_rec = await otps_crud.get_active_otp(db, str(user.id), EmailOTPPurpose.EMAIL_VERIFY)
-    if not otp_rec:
-        raise HTTPException(status_code=400, detail="No active OTP; please resend")
-    # attempt limit
-    if _int_attr(otp_rec.attempts) >= settings.OTP_MAX_ATTEMPTS:
-        raise HTTPException(status_code=429, detail="Too many attempts; try later")
-    if not verify_otp(str(user.id), EmailOTPPurpose.EMAIL_VERIFY.value, data.otp, _str_attr(otp_rec.otp_hash)):
-        await otps_crud.increment_attempts(db, str(otp_rec.id))
-        await audit(db, "verify_email.fail", actor_user_id=str(user.id), payload={"email": _str_attr(user.email)})
-        raise HTTPException(status_code=400, detail="Invalid code")
-    # success
-    await otps_crud.mark_used(db, str(otp_rec.id))
-    # auto-approve by domain
-    domain_allow = {d.strip().lower() for d in settings.ALLOWED_AUTO_APPROVE_DOMAINS.split(',') if d.strip()}
-    domain = _str_attr(user.email).split("@")[-1].lower()
-    new_status = UserStatus.APPROVED if domain in domain_allow else UserStatus.PENDING_ADMIN_APPROVAL
-    await users_crud.set_status(db, str(user.id), new_status)
-    await audit(db, "verify_email.success", actor_user_id=str(user.id), payload={"email": _str_attr(user.email), "status": new_status.value})
-    return VerifyEmailResponse(status=new_status.value, message="Email verified")
+    try:
+        new_status = await auth_service.verify_email(db, str(user.id), data.otp)
+    except ValueError as e:
+        msg = str(e)
+        if msg == "No active OTP":
+            raise HTTPException(status_code=400, detail="No active OTP; please resend")
+        if msg == "Too many attempts":
+            raise HTTPException(status_code=429, detail="Too many attempts; try later")
+        if msg == "Invalid code":
+            raise HTTPException(status_code=400, detail="Invalid code")
+        raise HTTPException(status_code=400, detail=msg)
+    return VerifyEmailResponse(status=new_status, message="Email verified")
 
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user = await users_crud.get_by_email(db, data.email)
-    if not user:
+    try:
+        token, role, user_id = await auth_service.authenticate_user(db, data.email, data.password)
+    except ValueError as e:
+        msg = str(e)
+        if msg.startswith("User not approved"):
+            raise HTTPException(status_code=403, detail=msg)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    status_str = _str_attr(user.status)
-    if status_str != UserStatus.APPROVED.value:
-        raise HTTPException(status_code=403, detail=f"User not approved: {status_str}")
-    if not verify_password(data.password, _str_attr(user.password_hash)):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(str(user.id), _str_attr(user.role), expires_minutes=60)
-    await users_crud.set_last_login(db, str(user.id))
-    return LoginResponse(access_token=token, expires_in=60*60, role=_str_attr(user.role))
+    return LoginResponse(access_token=token, expires_in=60*60, role=role)
 
 
 @router.post("/auth/resend-email-otp")
@@ -165,26 +157,19 @@ async def resend_email_otp(data: ResendEmailOTPRequest, background: BackgroundTa
     user = await users_crud.get_by_email(db, data.email)
     if not user:
         return {"status": "ok"}
-    # SQL-based rate limit by counting created OTP rows within last hour
-    from datetime import timedelta
-    max_req = max(1, settings.OTP_RESEND_RATE_PER_HOUR)
-    since = datetime.now(timezone.utc) - timedelta(hours=1)
-    recent = await otps_crud.count_recent_otps(db, str(user.id), EmailOTPPurpose.EMAIL_VERIFY, since)
-    if recent >= max_req:
-        raise HTTPException(status_code=429, detail="Too many resend attempts; try later")
-    otp, otp_hash, expires_at = generate_otp_and_hash(str(user.id), EmailOTPPurpose.EMAIL_VERIFY.value, settings.EMAIL_OTP_TTL_HOURS)
-    await otps_crud.create_otp(db, str(user.id), EmailOTPPurpose.EMAIL_VERIFY, otp_hash, expires_at)
-    subject, html = render_otp_email(otp, "email_verify")
+    try:
+        otp_plain = await auth_service.issue_resend_email_otp(db, str(user.id))
+    except ValueError as e:
+        if str(e) == "Too many resend attempts":
+            raise HTTPException(status_code=429, detail="Too many resend attempts; try later")
+        raise HTTPException(status_code=400, detail=str(e))
+    subject, html = render_otp_email(otp_plain, "email_verify")
     background.add_task(send_email, _str_attr(user.email), subject, html)
     return {"status": "ok"}
 
 
 @router.post("/auth/request-change-password-otp")
 async def request_change_password_otp(request: Request, db: AsyncSession = Depends(get_db)):
-    """Issue an OTP for password change when user prefers OTP path.
-
-    Requires authenticated bearer token. Rate limited via SQL counting.
-    """
     auth = request.headers.get("Authorization")
     if not auth or not auth.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -196,18 +181,21 @@ async def request_change_password_otp(request: Request, db: AsyncSession = Depen
     uid = claims.get("sub")
     if not uid:
         raise HTTPException(status_code=401, detail="Invalid token claims")
-    res = await db.execute(select(User).where(User.id == uid))
-    user = res.scalar_one_or_none()
+    # Ensure UUID type for comparison with UUID(as_uuid=True) column
+    try:
+        uid_uuid = UUID(str(uid))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+    user_res = await db.execute(select(User).where(User.id == uid_uuid))
+    user = user_res.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    from datetime import timedelta
-    max_req = max(1, settings.OTP_RESEND_RATE_PER_HOUR)
-    since = datetime.now(timezone.utc) - timedelta(hours=1)
-    recent = await otps_crud.count_recent_otps(db, str(user.id), EmailOTPPurpose.CHANGE_PWD, since)
-    if recent >= max_req:
-        raise HTTPException(status_code=429, detail="Too many requests; try later")
-    otp, otp_hash, expires_at = generate_otp_and_hash(str(user.id), EmailOTPPurpose.CHANGE_PWD.value, settings.EMAIL_OTP_TTL_HOURS)
-    await otps_crud.create_otp(db, str(user.id), EmailOTPPurpose.CHANGE_PWD, otp_hash, expires_at)
+    try:
+        await auth_service.request_change_password_otp(db, str(user.id))
+    except ValueError as e:
+        if str(e) == "Too many requests":
+            raise HTTPException(status_code=429, detail="Too many requests; try later")
+        raise HTTPException(status_code=400, detail=str(e))
     return {"status": "ok"}
 
 
@@ -216,16 +204,13 @@ async def forgot_password(data: ForgotPasswordRequest, background: BackgroundTas
     user = await users_crud.get_by_email(db, data.email)
     if not user:
         return {"status": "ok"}
-    # SQL-based rate limit: count recent OTPs for forgot password in last hour
-    from datetime import timedelta
-    max_req = max(1, settings.OTP_RESEND_RATE_PER_HOUR)
-    since = datetime.now(timezone.utc) - timedelta(hours=1)
-    recent = await otps_crud.count_recent_otps(db, str(user.id), EmailOTPPurpose.FORGOT_PWD, since)
-    if recent >= max_req:
-        raise HTTPException(status_code=429, detail="Too many requests; try later")
-    otp, otp_hash, expires_at = generate_otp_and_hash(str(user.id), EmailOTPPurpose.FORGOT_PWD.value, settings.FORGOT_PWD_OTP_TTL_HOURS)
-    await otps_crud.create_otp(db, str(user.id), EmailOTPPurpose.FORGOT_PWD, otp_hash, expires_at)
-    subject, html = render_otp_email(otp, "forgot_pwd")
+    try:
+        otp_plain = await auth_service.issue_forgot_password_otp(db, str(user.id))
+    except ValueError as e:
+        if str(e) == "Too many requests":
+            raise HTTPException(status_code=429, detail="Too many requests; try later")
+        raise HTTPException(status_code=400, detail=str(e))
+    subject, html = render_otp_email(otp_plain, "forgot_pwd")
     background.add_task(send_email, _str_attr(user.email), subject, html)
     await audit(db, "forgot_password.requested", actor_user_id=str(user.id), payload={"email": _str_attr(user.email)})
     return {"status": "ok"}
@@ -236,49 +221,56 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     user = await users_crud.get_by_email(db, data.email)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    otp_rec = await otps_crud.get_active_otp(db, str(user.id), EmailOTPPurpose.FORGOT_PWD)
-    if not otp_rec:
-        raise HTTPException(status_code=400, detail="No active OTP")
-    if _int_attr(otp_rec.attempts) >= settings.OTP_MAX_ATTEMPTS:
-        raise HTTPException(status_code=429, detail="Too many attempts")
-    if not verify_otp(str(user.id), EmailOTPPurpose.FORGOT_PWD.value, data.otp, _str_attr(otp_rec.otp_hash)):
-        await otps_crud.increment_attempts(db, str(otp_rec.id))
-        raise HTTPException(status_code=400, detail="Invalid code")
-    validate_password_policy(data.new_password)
-    await users_crud.update_password(db, str(user.id), hash_password(data.new_password))
-    await otps_crud.mark_used(db, str(otp_rec.id))
-    await audit(db, "password.reset", actor_user_id=str(user.id))
+    try:
+        await auth_service.reset_password_with_otp(db, str(user.id), data.otp, data.new_password)
+    except ValueError as e:
+        msg = str(e)
+        if msg == "No active OTP":
+            raise HTTPException(status_code=400, detail="No active OTP")
+        if msg == "Too many attempts":
+            raise HTTPException(status_code=429, detail="Too many attempts")
+        if msg == "Invalid code":
+            raise HTTPException(status_code=400, detail="Invalid code")
+        if msg == "User not found":
+            raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=400, detail=msg)
     return {"status": "ok"}
 
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    # For simplicity, treat authenticated user by Authorization header Bearer token
     auth = request.headers.get("Authorization")
-    user: Optional[User] = None
-    if auth and auth.lower().startswith("bearer "):
-        from app.security.jwt import decode_token
-        try:
-            claims = decode_token(auth.split()[1])
-            uid = claims.get("sub")
-            res = await db.execute(select(User).where(User.id == uid))
-            user = res.scalar_one_or_none()
-        except Exception:
-            user = None
-    if not user:
-        # require OTP path
+    if not auth or not auth.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
-    if data.current_password is not None:
-        if not verify_password(data.current_password, _str_attr(user.password_hash)):
-            raise HTTPException(status_code=400, detail="Current password invalid")
-    elif data.otp:
-        otp_rec = await otps_crud.get_active_otp(db, str(user.id), EmailOTPPurpose.CHANGE_PWD)
-        if not otp_rec or not verify_otp(str(user.id), EmailOTPPurpose.CHANGE_PWD.value, data.otp, _str_attr(otp_rec.otp_hash)):
-            raise HTTPException(status_code=400, detail="Invalid code")
-        await otps_crud.mark_used(db, str(otp_rec.id))
-    else:
-        raise HTTPException(status_code=400, detail="Provide current_password or otp")
-    validate_password_policy(data.new_password)
-    await users_crud.update_password(db, str(user.id), hash_password(data.new_password))
-    await audit(db, "password.changed", actor_user_id=str(user.id))
+    from app.security.jwt import decode_token
+    try:
+        claims = decode_token(auth.split()[1])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    uid = claims.get("sub")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+    try:
+        uid_uuid = UUID(str(uid))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token claims")
+    try:
+        await auth_service.change_password(
+            db,
+            str(uid_uuid),
+            current_password=data.current_password,
+            otp=data.otp,
+            new_password=data.new_password,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if msg == "User not found":
+            raise HTTPException(status_code=404, detail=msg)
+        if msg == "Current password invalid":
+            raise HTTPException(status_code=400, detail=msg)
+        if msg == "Invalid code":
+            raise HTTPException(status_code=400, detail=msg)
+        if msg == "Provide current_password or otp":
+            raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
     return {"status": "ok"}

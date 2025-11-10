@@ -51,6 +51,10 @@ If spans are missing:
 
 Per-project inference requests (`POST /api/v1/projects/{projectId}/infer/providers`) are limited to a configurable number per rolling minute window.
 
+OTP resend limits
+
+In addition to inference limits, auth OTP resends are governed by `OTP_RESEND_RATE_PER_HOUR` over a rolling 1-hour window. The initial registration OTP is excluded from resend accounting; up to `OTP_RESEND_RATE_PER_HOUR` additional resends are allowed during the window.
+
 ### Environment Variables
 
 ```
@@ -71,6 +75,8 @@ FF_ENABLE_RATE_LIMIT_AUDIT=true
 {"detail": "Rate limit exceeded; try again later"}
 ```
 - When `FF_ENABLE_RATE_LIMIT_AUDIT` is true, an audit event is inserted with action `llm.infer.rate_limited` and payload `{ "limit": <int> }`.
+
+For OTP resends, the auth endpoints return HTTP 429 when the resend allowance is exhausted for the current window.
 
 ### Adjusting the Limit
 

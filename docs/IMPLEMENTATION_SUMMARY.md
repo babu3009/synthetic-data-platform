@@ -4,6 +4,11 @@
 
 Successfully implemented a complete database layer for the Synthetic Data Platform backend with SQLAlchemy models, Alembic migrations, Pydantic schemas, FastAPI CRUD operations, comprehensive tests, and security features (OIDC scaffolding, project-scoped API keys, and RBAC).
 
+Recent architectural updates (Nov 2025):
+- Module-oriented backend: services and APIs are progressively organized under `app/modules/*` (auth, users, llm, synth, storage, admin) with legacy shims preserved for stability.
+- LLM clients refactor: split into `app/modules/llm/clients/*` with a stable `app/modules/llm/factory.py`. Prefer `from app.modules.llm.factory import LLMClientFactory`.
+- Auth hardening: UUID normalization across repositories to avoid dialect `.hex` issues; OTP resend limit applies to resends only (initial registration OTP excluded); endpoints send the single OTP created by the service to prevent duplicates.
+
 ## What Was Implemented
 
 ### 1. Database Models (SQLAlchemy 2.x)

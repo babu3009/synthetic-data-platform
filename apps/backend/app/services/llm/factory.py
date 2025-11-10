@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.db.models import (
     LLMModel,
     LLMCredential,
 )
-from app.services.llm.clients import (
+from app.modules.llm.clients import (
     BaseLLMClient,
     OpenAIClient,
     AnthropicClient,
@@ -47,7 +47,12 @@ class LLMClientFactory:
             select(ProjectLLMSetting).where(ProjectLLMSetting.project_id == project_id)
         )
         setting: Optional[ProjectLLMSetting] = setting_res.scalar_one_or_none()
-        if not setting or not setting.enabled or not setting.provider_id:
+        # Cast columns to concrete python types for type-checkers
+        if not setting:
+            return None
+        setting_enabled = cast(bool, setting.enabled)
+        setting_provider_id = cast(Optional[UUID], setting.provider_id)
+        if (not setting_enabled) or (not setting_provider_id):
             return None
 
         # Provider
@@ -55,12 +60,15 @@ class LLMClientFactory:
             select(LLMProvider).where(LLMProvider.id == setting.provider_id)
         )
         provider: Optional[LLMProvider] = provider_res.scalar_one_or_none()
-        if not provider or not provider.is_enabled:
+        if not provider:
+            return None
+        provider_enabled = cast(bool, provider.is_enabled)
+        if not provider_enabled:
             return None
 
         # Model (optional)
         model: Optional[LLMModel] = None
-        if setting.model_id:
+        if cast(Optional[UUID], setting.model_id):
             model_res = await db.execute(
                 select(LLMModel).where(LLMModel.id == setting.model_id)
             )
@@ -75,34 +83,35 @@ class LLMClientFactory:
         api_key: Optional[str] = None
         if cred:
             try:
-                payload = decrypt_json(cred.enc_payload_json)
+                payload = decrypt_json(cast(str, cred.enc_payload_json))
                 api_key = payload.get("api_key")
             except Exception:  # pragma: no cover - decryption error path
                 api_key = None
 
-        base_url = provider.base_url
-        model_name = model.name if model else None
+        base_url = cast(Optional[str], provider.base_url)
+        model_name = cast(Optional[str], model.name) if model else None
 
         client: BaseLLMClient
-        if provider.kind == LLMProviderKind.OPENAI:
+        pkind = cast(LLMProviderKind, provider.kind)
+        if pkind == LLMProviderKind.OPENAI:
             client = OpenAIClient(api_key=api_key, base_url=base_url, model=model_name)
-        elif provider.kind == LLMProviderKind.ANTHROPIC:
+        elif pkind == LLMProviderKind.ANTHROPIC:
             client = AnthropicClient(api_key=api_key, base_url=base_url, model=model_name)
-        elif provider.kind == LLMProviderKind.OLLAMA:
+        elif pkind == LLMProviderKind.OLLAMA:
             client = OllamaClient(base_url=base_url, model=model_name)
-        elif provider.kind == LLMProviderKind.LMSTUDIO:
+        elif pkind == LLMProviderKind.LMSTUDIO:
             client = LMStudioClient(base_url=base_url, model=model_name)
         else:
             # CUSTOM unsupported for now
             return None
 
         mcfg = ModelConfig(
-            provider_kind=provider.kind.value,
-            provider_name=provider.name,
+            provider_kind=cast(LLMProviderKind, provider.kind).value,
+            provider_name=cast(str, provider.name),
             model_name=model_name,
-            temperature=setting.temperature,
-            top_p=setting.top_p,
-            max_tokens=setting.max_tokens,
-            supports_json=model.supports_json if model else None,
+            temperature=cast(Optional[float], setting.temperature),
+            top_p=cast(Optional[float], setting.top_p),
+            max_tokens=cast(Optional[int], setting.max_tokens),
+            supports_json=cast(Optional[bool], model.supports_json) if model else None,
         )
         return client, mcfg

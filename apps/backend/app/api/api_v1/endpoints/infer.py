@@ -11,7 +11,7 @@ from app.security.auth import get_current_principal, require_project_scope
 from app.db.models import ProjectRole
 from app import schemas
 from app.services.providers_infer import ColumnSpec, infer_providers_combined
-from app.services.llm import LLMClientFactory
+from app.modules.llm.service import get_llm_for_project
 from sqlalchemy.future import select
 from app.db.models import ProjectLLMSetting, AuditEvent
 from uuid import UUID
@@ -107,7 +107,7 @@ async def infer_providers_for_project(
         res = await db.execute(select(ProjectLLMSetting).where(ProjectLLMSetting.project_id == pid_uuid))
         setting = res.scalar_one_or_none()
         if setting and bool(getattr(setting, "enabled", False)) and getattr(setting, "provider_id", None):
-            fac_res = await LLMClientFactory.get_for_project(db, project_id=pid_uuid)
+            fac_res = await get_llm_for_project(db, project_id=pid_uuid)
             if fac_res:
                 client, cfg = fac_res
                 try:

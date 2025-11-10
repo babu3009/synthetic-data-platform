@@ -1,28 +1,27 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import artifacts, health, projects, requests, sources, flat, validate, webhooks, api_keys, auth, infer, llm_admin, llm_settings, users, admin_users
+# Legacy endpoints still imported for health/projects/api_keys/webhooks until modularized
+from app.api.api_v1.endpoints import health, projects, api_keys, webhooks
+
+# Module routers (Phase 1 migration)
+from app.modules.auth.api import router as auth_router
+from app.modules.users.api import router as users_router
+from app.modules.admin.api import router as admin_router
+from app.modules.llm.api import router as llm_router
+from app.modules.synth.api import router as synth_router
+# storage module currently has no routes yet
 
 api_router = APIRouter()
+
+# Health & top-level project resources (still legacy)
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
-api_router.include_router(
-    sources.router, prefix="/projects/{project_id}/sources", tags=["sources"]
-)
-api_router.include_router(
-    requests.router, prefix="/projects/{project_id}/requests", tags=["requests"]
-)
-api_router.include_router(
-    api_keys.router, prefix="/projects/{project_id}/api-keys", tags=["api-keys"]
-)
-api_router.include_router(artifacts.router, prefix="/requests", tags=["artifacts"])
-api_router.include_router(flat.router, prefix="/flat", tags=["flat"])  # /api/v1/flat/preview
-api_router.include_router(flat.req_router, prefix="/requests", tags=["requests"])  # /api/v1/requests/{id}:start
-api_router.include_router(validate.router, tags=["validate"])  # /api/v1/validate
+api_router.include_router(api_keys.router, prefix="/projects/{project_id}/api-keys", tags=["api-keys"])
 api_router.include_router(webhooks.router, tags=["webhooks"])  # /api/v1/webhooks/run-status
-api_router.include_router(auth.router, tags=["auth"])  # /api/v1/auth/login, /auth/callback
-api_router.include_router(users.router, tags=["Users"])  # /api/v1/users/me, avatar
-api_router.include_router(admin_users.router, tags=["Admin"])  # /api/v1/admin/users
-api_router.include_router(infer.router, prefix="/projects/{project_id}/infer", tags=["infer"])
-api_router.include_router(infer.root_router, prefix="/infer", tags=["infer"])  # alias
-api_router.include_router(llm_admin.router, prefix="/admin/llm", tags=["admin-llm"])  # requires project_id query param & OWNER role
-api_router.include_router(llm_settings.router, prefix="/projects/{project_id}/llm-settings", tags=["llm"])
+
+# Modular routers preserving existing prefixes & tags
+api_router.include_router(auth_router, tags=["auth"])  # /api/v1/auth/*
+api_router.include_router(users_router, tags=["Users"])  # /api/v1/users/*
+api_router.include_router(admin_router, tags=["Admin"])  # /api/v1/admin/*
+api_router.include_router(llm_router)  # infer, admin-llm, llm-settings prefixes preserved inside module
+api_router.include_router(synth_router)  # sources, requests, artifacts, flat, validate

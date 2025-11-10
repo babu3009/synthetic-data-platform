@@ -7,7 +7,7 @@ A modern monorepo for generating and managing synthetic data using FastAPI, Reac
 ```
 synthetic-data-platform/
 ├── apps/
-│   ├── backend/          # FastAPI application
+│   ├── backend/          # FastAPI application (module-oriented backend)
 │   └── frontend/         # React + Vite application
 ├── infra/               # Infrastructure configuration
 ├── .devcontainer/       # Development container setup
@@ -278,3 +278,27 @@ Administrative endpoints for managing LLM providers, credentials, probing connec
 5. Set project LLM settings to enable inference and provider-assisted suggestions.
 
 See `docs/LLM_DISCOVERY.md` for detailed curl examples, troubleshooting, audit events, and behavior notes.
+
+### Backend module layout (high level)
+
+The backend is gradually refactored to a module-oriented layout under `app/modules/*` while keeping routes and OpenAPI stable:
+
+- `app/modules/auth` – schemas, repository, service wrappers for auth flows (register/verify/login, forgot/reset, change password).
+- `app/modules/users` – user profile and avatar.
+- `app/modules/llm` – clients split under `clients/` with a stable `factory.py`.
+- `app/modules/synth` – adapters and generators wrapping legacy services.
+- `app/modules/storage`, `app/modules/admin` – storage and admin functions.
+
+LLM import guidance:
+
+```python
+from app.modules.llm.factory import LLMClientFactory
+```
+
+Legacy shims under `app/services/llm/` re-export the factory/clients for backward compatibility and will be removed in a future cleanup.
+
+### Auth & OTP notes (implementation behavior)
+
+- UUID normalization: repositories coerce string UUIDs to `UUID` objects to avoid driver binding issues with `UUID(as_uuid=True)` columns.
+- Resend limits: `OTP_RESEND_RATE_PER_HOUR` applies to resends only; the initial registration OTP is excluded from the rolling-hour count.
+- Single OTP per call: endpoints send the OTP returned from the service; they do not create additional OTPs.

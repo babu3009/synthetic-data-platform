@@ -149,6 +149,18 @@ Include counts for discovery and latency for probe.
 - Project-level LLM settings & guardrails: see frontend LLM Settings page and `ProjectLLMSetting*` schemas.
 - Tracing & rate limits: `docs/TRACING_RATE_LIMIT.md`.
 
+### Python import guidance (for internal integrations)
+
+When programmatically constructing LLM clients from backend code, prefer the modular factory:
+
+```python
+from app.modules.llm.factory import LLMClientFactory
+
+client = LLMClientFactory.for_project(db, project_id)
+```
+
+Legacy re-exports remain under `app/services/llm/` for backward compatibility during the deprecation window.
+
 ## Next Steps
 After successful discovery:
 1. Set project LLM settings (`provider_id` + `model_id` + optional temperature/top_p/max_tokens).

@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""DEPRECATED (Phase 5): legacy relational data generation implementation.
+
+This module remains for backward compatibility. Prefer importing the
+generation API via:
+
+    from app.modules.synth.generators.relational_generator import generate_to_artifacts
+
+Over time, logic will be consolidated under `app/modules/synth/`.
+"""
+
 from collections import defaultdict, Counter, deque
 from dataclasses import dataclass
 from pathlib import Path
