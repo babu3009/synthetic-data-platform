@@ -255,6 +255,24 @@ Use `-DryRun` to validate/parse without writing outputs.
 - **Frontend**: ESLint, Prettier, TypeScript
 - **Pre-commit hooks**: Automated code quality checks
 
+## Coverage gates
+
+We enforce coverage targets in CI via Codecov. Recommended thresholds:
+
+- Project coverage: ≥ 80%
+- Patch (PR) coverage: ≥ 80%
+
+How to validate locally:
+
+- Backend (from `apps/backend`): run pytest with coverage and review the terminal report (or XML as needed).
+- Frontend (from `apps/frontend`): use the provided coverage scripts; Vitest uses the V8 provider.
+
+CI integration and branch protection:
+
+- Codecov will report two checks on pull requests: “codecov/project” and “codecov/patch”.
+- In GitHub repository settings, enable Branch protection and require these checks to pass at the thresholds above.
+- Documented acceptance: PRs must meet or exceed the targets before merge unless explicitly waived.
+
 ## Observability
 
 - Metrics endpoint: `GET http://localhost:8000/metrics` (Prometheus format)
