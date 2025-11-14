@@ -10,9 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 
-from app.crud import llm_provider as crud_provider, llm_model as crud_model, llm_credential as crud_cred
+from app.crud import (
+    llm_provider as crud_provider,
+    llm_model as crud_model,
+    llm_credential as crud_cred,
+    llm_task_default as crud_task_default,
+)
 from app.db.session import get_db
-from app.db.models import AuditEvent, ProjectRole, LLMModel, LLMCredential
+from app.db.models import AuditEvent, ProjectRole, LLMModel, LLMCredential, LLMTaskType
 from app.schemas.llm import (
     LLMProvider,
     LLMProviderCreate,
@@ -23,6 +28,7 @@ from app.schemas.llm import (
     LLMModelOut,
     ProbeResponse,
     DiscoverModelsResponse,
+    ProviderTaskDefaultOut,
 )
 from app.security.auth import get_current_principal, require_project_scope
 from app.utils.crypto import encrypt_json, mask_secret
@@ -194,6 +200,144 @@ async def create_model(
     await db.commit()
 
     return LLMModelOut.model_validate(db_model)
+
+
+@router.patch("/providers/{provider_id}/models/{model_id}:mark-default", response_model=LLMModelOut)
+async def mark_model_default(
+    *,
+    db: AsyncSession = Depends(get_db),
+    provider_id: UUID,
+    model_id: UUID,
+    principal = Depends(get_current_principal),
+    project_id: UUID,
+    task_type: Optional[LLMTaskType] = None,
+):
+    """Mark a single model as default for the provider and unset others.
+    Also updates provider.default_model_id for quick lookup.
+    """
+    await require_project_scope(str(project_id), required_roles=[ProjectRole.OWNER], principal=principal, db=db)
+    prov = await crud_provider.get(db, id=provider_id)
+    if not prov:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    # Validate model belongs to provider
+    models = await crud_model.get_by_provider(db, provider_id=provider_id)
+    target = next((m for m in models if m.id == model_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Model not found for this provider")
+
+    # Unset others; set target (global default semantics)
+    changed = False
+    if task_type is None:
+        for m in models:
+            desired = (m.id == target.id)
+            if bool(m.is_default) != desired:
+                m.is_default = desired
+                db.add(m)
+                changed = True
+        # Update provider denormalized pointer
+        if getattr(prov, "default_model_id", None) != target.id:
+            prov.default_model_id = target.id
+            db.add(prov)
+            changed = True
+    else:
+        # Per-task default: upsert mapping without toggling global is_default flag
+        existing = await crud_task_default.get_by_provider_and_task(db, provider_id=provider_id, task_type=task_type)
+        if existing:
+            if existing.model_id != target.id:
+                existing.model_id = target.id
+                db.add(existing)
+                changed = True
+        else:
+            from app.db.models import LLMProviderTaskDefault
+            rec = LLMProviderTaskDefault(provider_id=provider_id, task_type=task_type, model_id=target.id)
+            db.add(rec)
+            changed = True
+        # For UX consistency, if task_type is chat, update provider.default_model_id as well
+        if str(task_type.value) == "chat" and getattr(prov, "default_model_id", None) != target.id:
+            prov.default_model_id = target.id
+            db.add(prov)
+            changed = True
+
+    if changed:
+        await db.commit()
+        # refresh target to get latest state
+        await db.refresh(target)
+
+    actor = getattr(principal, "actor", "unknown")
+    payload = {
+        "provider_id": str(provider_id),
+        "model_id": str(model_id),
+    }
+    if task_type is not None:
+        payload["task_type"] = str(task_type.value)
+    db.add(AuditEvent(actor=actor, project_id=project_id, action="llm.model.mark_default", payload_json=payload))
+    await db.commit()
+
+    return LLMModelOut.model_validate(target)
+
+
+# Audit listing (recent)
+@router.get("/audit/recent", response_model=list[dict])
+async def list_recent_audit(
+    *,
+    db: AsyncSession = Depends(get_db),
+    principal = Depends(get_current_principal),
+    project_id: UUID,
+    limit: int = 50,
+    action_prefix: Optional[str] = "llm."
+):
+    """Return recent audit events for the project, optionally filtered by action prefix.
+
+    Note: For now returns a simple list of dicts to avoid introducing new schemas.
+    """
+    await require_project_scope(str(project_id), required_roles=[ProjectRole.OWNER], principal=principal, db=db)
+    from sqlalchemy import select, desc
+    from app.db.models import AuditEvent as DBAudit
+
+    stmt = select(DBAudit).where(DBAudit.project_id == project_id)
+    if action_prefix:
+        stmt = stmt.where(DBAudit.action.startswith(action_prefix))
+    stmt = stmt.order_by(desc(DBAudit.created_at)).limit(max(1, min(200, limit)))
+
+    res = await db.execute(stmt)
+    events = res.scalars().all()
+    # Project a compact representation
+    out = []
+    for ev in events:
+        out.append({
+            "id": str(ev.id),
+            "actor": ev.actor,
+            "project_id": str(project_id) if ev.project_id else None,
+            "action": ev.action,
+            "payload_json": ev.payload_json or {},
+            "created_at": ev.created_at.isoformat() if ev.created_at else None,
+        })
+    return out
+
+
+# Task defaults listing per provider
+@router.get("/providers/{provider_id}/task-defaults", response_model=list[ProviderTaskDefaultOut])
+async def list_task_defaults(
+    *,
+    db: AsyncSession = Depends(get_db),
+    provider_id: UUID,
+    principal = Depends(get_current_principal),
+    project_id: UUID,
+):
+    await require_project_scope(str(project_id), required_roles=[ProjectRole.OWNER], principal=principal, db=db)
+    prov = await crud_provider.get(db, id=provider_id)
+    if not prov:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    rows = await crud_task_default.list_by_provider(db, provider_id=provider_id)
+    # Map model_id -> model for embedding
+    models = await crud_model.get_by_provider(db, provider_id=provider_id)
+    by_id = {m.id: m for m in models}
+    out: list[ProviderTaskDefaultOut] = []
+    for r in rows:
+        m = by_id.get(r.model_id)
+        out.append(ProviderTaskDefaultOut(task_type=str(r.task_type.value), model_id=r.model_id, model=LLMModelOut.model_validate(m) if m else None))
+    return out
 
 
 # Operations

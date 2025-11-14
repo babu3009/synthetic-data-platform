@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 
 export interface ToastItem { id: string; kind: 'success'|'error'|'info'; message: string; ts: number }

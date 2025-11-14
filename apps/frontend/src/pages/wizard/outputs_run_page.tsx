@@ -40,10 +40,15 @@ export default function OutputsRunPage() {
     try {
       setEstimating(true)
       // Create a draft request just for estimation
+      // Backend expects 'schema' not 'entity' in params_json
+      const schema = {
+        tables: entity.tables,
+        relationships: entity.relationships,
+      }
       const payload = {
         type,
         params_json: {
-          entity,
+          schema,
           outputs: { formats: formatsArray(), destination },
           schedule: schedule || undefined,
         },
@@ -52,7 +57,8 @@ export default function OutputsRunPage() {
       const est = await estimateRequest(projectId, req.id)
       setEstimate(est)
     } catch (e: unknown) {
-      setError((e as Error)?.message || 'Failed to estimate')
+      const errMsg = (e as any)?.response?.data?.detail || (e as Error)?.message || 'Failed to estimate'
+      setError(errMsg)
     } finally {
       setEstimating(false)
     }
@@ -64,10 +70,15 @@ export default function OutputsRunPage() {
     if (!entity) { setError('No entity selected.'); return }
     try {
       setCreating(true)
+      // Backend expects 'schema' not 'entity' in params_json
+      const schema = {
+        tables: entity.tables,
+        relationships: entity.relationships,
+      }
       const payload = {
         type,
         params_json: {
-          entity,
+          schema,
           outputs: { formats: formatsArray(), destination },
           schedule: schedule || undefined,
         },
@@ -78,7 +89,8 @@ export default function OutputsRunPage() {
       // Navigate to request detail page
       navigate(`/projects/${projectId}/requests/${req.id}`)
     } catch (e: unknown) {
-      setError((e as Error)?.message || 'Failed to create request')
+      const errMsg = (e as any)?.response?.data?.detail || (e as Error)?.message || 'Failed to create request'
+      setError(errMsg)
     } finally {
       setCreating(false)
     }

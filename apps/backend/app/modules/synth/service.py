@@ -122,6 +122,26 @@ async def upload_source(
     )
 
 
+async def list_sources(db: AsyncSession, *, project_id: UUID, skip: int = 0, limit: int = 100):
+    """List sources for a project.
+
+    Returns lightweight Source schemas suitable for list views.
+    """
+    project = await crud.project.get(db=db, id=project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    res = await db.execute(
+        select(models.Source)
+        .where(models.Source.project_id == project_id)
+        .order_by(models.Source.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    sources = list(res.scalars().all())
+    # Pydantic model configured with from_attributes, FastAPI can serialize ORM models directly
+    return sources
+
+
 async def get_source_schema(db: AsyncSession, *, source_id: UUID) -> schemas.SchemaResponse:
     res = await db.execute(select(models.Schema).where(models.Schema.source_id == source_id))
     schema_record = res.scalar_one_or_none()
@@ -318,6 +338,7 @@ def validate_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 __all__ = [
     # Sources
+    "list_sources",
     "upload_source",
     "get_source_schema",
     "get_source_dag",

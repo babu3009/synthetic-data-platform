@@ -106,7 +106,13 @@ const ProjectDetailPage: React.FC = () => {
     <div className="container py-4 auth-narrow">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0">Project</h2>
-        <button className="btn btn-outline-danger" disabled={delMut.isPending} onClick={handleDelete}>Delete</button>
+        <div className="d-flex gap-2">
+          <Link className="btn btn-outline-secondary" to={`/projects/${id}/sources`}>Sources</Link>
+          <Link className="btn btn-outline-secondary" to={`/projects/${id}/api-keys`}>API Keys</Link>
+          <Link className="btn btn-outline-secondary" to={`/projects/${id}/requests`}>Requests</Link>
+          <Link className="btn btn-outline-secondary" to={`/projects/${id}/validation`}>Validation</Link>
+          <button className="btn btn-outline-danger" disabled={delMut.isPending} onClick={handleDelete}>Delete</button>
+        </div>
       </div>
   <form onSubmit={handleSubmit}>
         <div className="mb-3">

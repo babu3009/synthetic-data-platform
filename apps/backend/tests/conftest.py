@@ -52,19 +52,25 @@ async def db_session():
     - If the configured DB is unreachable, fall back to a local SQLite file.
     """
     db_url = settings.get_database_url()
-    # Align with model metadata schema to avoid mismatches
-    schema_name = (getattr(Base.metadata, "schema", None) or MODEL_SCHEMA or "public")
+    # Prefer isolated testing schema when configured, else fall back to model schema
+    schema_name = (settings.TESTING_DB_SCHEMA or getattr(Base.metadata, "schema", None) or MODEL_SCHEMA or "public")
     is_sqlite = db_url.startswith("sqlite")
 
     execution_options = {}
     connect_args = {}
+    # Map model schema -> testing schema when using Postgres to keep production schema untouched
+    model_schema = (getattr(Base.metadata, "schema", None) or MODEL_SCHEMA or "public")
+    use_schema_translate = (not is_sqlite) and (schema_name and schema_name != model_schema)
     if is_sqlite:
         execution_options = {"schema_translate_map": {schema_name: None}}
+    elif use_schema_translate:
+        execution_options = {"schema_translate_map": {model_schema: schema_name}}
     else:
         # asyncpg: set search_path for tests and a short connect timeout
         connect_args = {
             "server_settings": {"search_path": f"{schema_name}, public"},
-            "timeout": 3.0,
+            # Allow more time for remote/forwarded DBs to accept connections
+            "timeout": 10.0,
         }
 
     engine = create_async_engine(
@@ -74,16 +80,21 @@ async def db_session():
         connect_args=connect_args,
     )
 
-    # Attempt to connect; if the configured DB is unavailable, fall back to SQLite for tests
+    # Attempt to connect; optionally allow fallback to SQLite only if explicitly enabled
     try:
         async with engine.begin() as conn:
             if not is_sqlite:
-                # Ensure schema exists in Postgres
+                # Ensure schema exists in Postgres and set search_path for this connection
                 await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+                await conn.execute(text(f"SET search_path TO {schema_name}, public"))
             await conn.run_sync(Base.metadata.create_all)
     except Exception:
+        allow_fallback = os.getenv("ALLOW_SQLITE_FALLBACK", "").lower() in {"1", "true", "yes"}
+        if not allow_fallback:
+            # Do not hide configuration issues: surface error instead of silently switching DBs
+            raise
         await engine.dispose()
-        # Fallback to SQLite file under repo-level testing/databases
+        # Fallback to SQLite file under repo-level testing/databases (explicit opt-in)
         repo_root = Path(__file__).resolve().parents[3]
         testing_dir = repo_root / "testing" / "databases"
         testing_dir.mkdir(parents=True, exist_ok=True)
@@ -113,7 +124,11 @@ async def db_session():
         yield session
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        if not is_sqlite and use_schema_translate:
+            # Drop entire testing schema to avoid FK cycles on drop_all
+            await conn.execute(text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))
+        else:
+            await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
 

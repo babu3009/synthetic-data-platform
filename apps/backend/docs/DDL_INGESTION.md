@@ -48,6 +48,33 @@ Parameters:
 }
 ```
 
+#### List Sources
+```http
+GET /api/v1/projects/{project_id}/sources?skip=0&limit=50
+```
+
+Query Parameters:
+- `skip` (int, default 0): Number of records to skip (offset pagination)
+- `limit` (int, default 100): Max number of sources to return (cap enforced server-side)
+
+Example Response:
+```json
+[
+  {
+    "id": "b5e3c6c2-3d6b-4f6e-9c1d-9f9d8c7e1a11",
+    "project_id": "d3a12f0b-0a5f-4c9e-a2f1-2c0e5f8b1234",
+    "kind": "ddl",
+    "storage_uri": "file://.../b5e3c6c2_schema.sql",
+    "checksum": "5d41402abc4b2a76b9719d911017c592",
+    "created_at": "2025-11-10T12:34:56.789Z"
+  }
+]
+```
+
+Notes:
+- Returns lightweight `Source` objects (without embedded schema). Use `GET /sources/{source_id}` for full schema.
+- Future: cursor-based pagination & filtering by kind/checksum.
+
 #### Get Schema
 ```http
 GET /api/v1/projects/{project_id}/sources/{source_id}

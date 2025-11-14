@@ -12,6 +12,7 @@ from .llm_provider import llm_provider
 from .llm_model import llm_model
 from .llm_credential import llm_credential
 from .project_llm_setting import project_llm_setting
+from .llm_task_default import llm_task_default
 
 __all__ = [
 	"project",
@@ -23,5 +24,6 @@ __all__ = [
 	"llm_model",
 	"llm_credential",
 	"project_llm_setting",
+    "llm_task_default",
 	"CRUDBase",
 ]

@@ -3,6 +3,10 @@ REM Development setup script for Synthetic Data Platform (Windows)
 
 echo 🚀 Setting up Synthetic Data Platform development environment...
 
+REM Establish root (handles spaces in path)
+set "ROOT=%~dp0"
+pushd "%ROOT%" >nul
+
 REM Check if required tools are installed
 docker --version >nul 2>&1
 if %errorlevel% neq 0 (
@@ -18,7 +22,7 @@ if %errorlevel% neq 0 (
 
 REM Backend setup
 echo 📦 Setting up backend...
-cd apps\backend
+pushd "%ROOT%apps\backend" >nul
 if not exist ".env" (
     copy .env.example .env
     echo ✅ Created backend .env file from template
@@ -37,7 +41,7 @@ poetry install
 
 REM Frontend setup
 echo 📦 Setting up frontend...
-cd ..\frontend
+popd & pushd "%ROOT%apps\frontend" >nul
 
 if not exist ".env" (
     copy .env.example .env
@@ -56,7 +60,7 @@ pnpm install
 
 REM Infrastructure setup
 echo 🏗️ Setting up infrastructure...
-cd ..\..\infra
+popd & pushd "%ROOT%infra" >nul
 if not exist ".env" (
     copy .env.example .env
     echo ✅ Created infrastructure .env file from template
@@ -64,11 +68,12 @@ if not exist ".env" (
 
 REM Pre-commit setup
 echo 🔧 Setting up pre-commit hooks...
-cd ..
+popd & pushd "%ROOT%" >nul
 pip install pre-commit
 pre-commit install
 
 echo 🎉 Development environment setup complete!
+popd >nul
 echo.
 echo Next steps:
 echo 1. Start infrastructure: make infra-up

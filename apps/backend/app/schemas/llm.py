@@ -131,3 +131,10 @@ class DiscoverModelsResponse(BaseModel):
     added_count: int = 0
     updated_count: int = 0
     unchanged_count: int = 0
+
+
+# Task-defaults (admin read models)
+class ProviderTaskDefaultOut(BaseModel):
+    task_type: str
+    model_id: UUID
+    model: Optional[LLMModelOut] = None

@@ -166,3 +166,19 @@ After successful discovery:
 1. Set project LLM settings (`provider_id` + `model_id` + optional temperature/top_p/max_tokens).
 2. Enable guardrails or JSON mode depending on provider capabilities.
 3. Use inference or provider suggestion endpoints with confirmed configuration.
+
+## Default Model Workflow
+
+This is the recommended flow to establish and manage a provider default model and apply it to a project:
+
+1. Discover models for the provider. The first discovery assigns a default automatically if none exists.
+2. In the Providers page, you can change the default via the inline models list (radio toggle) or from the Discover drawer using “Make Default”.
+  - The UI provides confirmation, optimistic UI feedback, and a11y status updates.
+  - If a rate limit (HTTP 429) occurs, the UI will back off briefly and retry once.
+3. In the Project LLM Settings page, click “Use provider default” to quickly align the project’s selected model with the provider’s default.
+4. Advanced knobs (temperature, top_p, max_tokens) and guardrails can be adjusted per project.
+
+Notes:
+- Newly discovered or updated models in a discovery run are highlighted in the drawer.
+- Server-side audit/metrics may record discovery and default changes when enabled.
+- Back-end guardrails like enforcing a single default per provider are recommended.

@@ -2,7 +2,7 @@
 Database seeding script for development and testing.
 """
 import asyncio
-from typing import List
+from typing import List, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -24,10 +24,24 @@ from app.db.models import (
     ProjectLLMSetting,
     ProjectMember,
     ProjectRole,
+    User,
+    UserRole,
+    UserStatus,
 )
 
 
-async def create_sample_projects(db: AsyncSession) -> List[Project]:
+async def get_or_create_user(db: AsyncSession, email: str, role: UserRole = UserRole.USER, status: UserStatus = UserStatus.APPROVED) -> User:
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(email=email, password_hash="!", role=role, status=status)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    return user
+
+
+async def create_sample_projects(db: AsyncSession) -> Tuple[List[Project], List[User]]:
     """Create sample projects."""
     projects_data = [
         {
@@ -47,19 +61,27 @@ async def create_sample_projects(db: AsyncSession) -> List[Project]:
         },
     ]
 
-    projects = []
+    # Ensure owners exist as users
+    owner_emails = sorted({p["owner"] for p in projects_data})
+    owners: List[User] = []
+    for email in owner_emails:
+        role = UserRole.ADMIN if email == "admin@company.com" else UserRole.USER
+        user = await get_or_create_user(db, email=email, role=role, status=UserStatus.APPROVED)
+        owners.append(user)
+
+    projects: List[Project] = []
     for project_data in projects_data:
-        project = Project(**project_data)
+        owner_email = project_data.pop("owner")
+        owner = next(u for u in owners if u.email == owner_email)
+        project = Project(name=project_data["name"], owner_user_id=owner.id, tags=project_data["tags"]) 
         db.add(project)
         projects.append(project)
 
     await db.commit()
-    
-    # Refresh to get IDs
     for project in projects:
         await db.refresh(project)
-    
-    return projects
+
+    return projects, owners
 
 
 async def create_sample_sources(db: AsyncSession, projects: List[Project]) -> List[Source]:
@@ -274,8 +296,7 @@ async def create_sample_llm_assets(db: AsyncSession, projects: List[Project]):
     provider = result.scalar_one_or_none()
     if provider is None:
         provider = LLMProvider(
-            # Use the lowercase enum value to avoid name/value mismatches
-            kind=LLMProviderKind.OPENAI.value,
+            kind=LLMProviderKind.OPENAI,
             name="openai",
             base_url="https://api.openai.com/v1",
             is_enabled=True,
@@ -332,33 +353,36 @@ async def create_sample_llm_assets(db: AsyncSession, projects: List[Project]):
     return provider, models
 
 
-async def create_sample_project_members(db: AsyncSession, projects: List[Project]):
+async def create_sample_project_members(db: AsyncSession, projects: List[Project], owners: List[User]):
     """Create sample project membership records."""
     members = []
     for p in projects:
-        # Owner membership
-        existing_owner = await db.execute(
-            select(ProjectMember).where(
-                (ProjectMember.project_id == p.id) & (ProjectMember.user_sub == p.owner)
+        # Owner membership (by user_id)
+        owner_user = next((u for u in owners if u.id == p.owner_user_id), None)
+        if owner_user is not None:
+            existing_owner = await db.execute(
+                select(ProjectMember).where(
+                    (ProjectMember.project_id == p.id) & (ProjectMember.user_id == owner_user.id)
+                )
             )
-        )
-        owner = existing_owner.scalar_one_or_none()
-        if owner is None:
-            owner = ProjectMember(project_id=p.id, user_sub=p.owner, role=ProjectRole.OWNER)
-            db.add(owner)
-            await db.commit()
-            await db.refresh(owner)
-        members.append(owner)
+            owner = existing_owner.scalar_one_or_none()
+            if owner is None:
+                owner = ProjectMember(project_id=p.id, user_id=owner_user.id, role=ProjectRole.OWNER)
+                db.add(owner)
+                await db.commit()
+                await db.refresh(owner)
+            members.append(owner)
 
         # Viewer membership
+        viewer_user = await get_or_create_user(db, email="viewer@company.com", role=UserRole.USER, status=UserStatus.APPROVED)
         existing_viewer = await db.execute(
             select(ProjectMember).where(
-                (ProjectMember.project_id == p.id) & (ProjectMember.user_sub == "viewer@company.com")
+                (ProjectMember.project_id == p.id) & (ProjectMember.user_id == viewer_user.id)
             )
         )
         viewer = existing_viewer.scalar_one_or_none()
         if viewer is None:
-            viewer = ProjectMember(project_id=p.id, user_sub="viewer@company.com", role=ProjectRole.VIEWER)
+            viewer = ProjectMember(project_id=p.id, user_id=viewer_user.id, role=ProjectRole.VIEWER)
             db.add(viewer)
             await db.commit()
             await db.refresh(viewer)
@@ -375,7 +399,7 @@ async def seed_database():
         try:
             # Create sample data
             print("Creating sample projects...")
-            projects = await create_sample_projects(db)
+            projects, owners = await create_sample_projects(db)
             print(f"✅ Created {len(projects)} projects")
 
             print("Creating sample sources...")
@@ -399,7 +423,7 @@ async def seed_database():
             print(f"✅ Created provider '{provider.name}' with {len(models)} models")
 
             print("Creating sample project members...")
-            members = await create_sample_project_members(db, projects)
+            members = await create_sample_project_members(db, projects, owners)
             print(f"✅ Created {len(members)} project member records")
 
             print("🎉 Database seeding completed successfully!")

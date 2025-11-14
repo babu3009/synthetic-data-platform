@@ -27,6 +27,14 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
   const [jsonText, setJsonText] = useState('')
   const [jsonValidating, setJsonValidating] = useState(false)
   const [jsonTables, setJsonTables] = useState<EntityTable[] | null>(null)
+  const [jsonMode, setJsonMode] = useState<'paste' | 'build'>('paste')
+  const [jsonBuilderTables, setJsonBuilderTables] = useState<EntityTable[]>([{
+    name: 'table_1',
+    columns: [
+      { name: 'id', dtype: 'uuid', nullable: false },
+    ],
+    pk: ['id'],
+  }])
 
   // Fields designer state
   const [tables, setTables] = useState<EntityTable[]>([{
@@ -57,6 +65,8 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     setJsonText('')
     setJsonValidating(false)
     setJsonTables(null)
+    setJsonMode('paste')
+    setJsonBuilderTables([{ name: 'table_1', columns: [{ name: 'id', dtype: 'uuid', nullable: false }], pk: ['id'] }])
     setTables([{ name: 'table_1', columns: [{ name: 'id', dtype: 'uuid', nullable: false }], pk: ['id'] }])
   }
 
@@ -138,23 +148,45 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     const idx = tables.length + 1
     setTables([...tables, { name: `table_${idx}`, columns: [], pk: [] }])
   }
+  function addJsonBuilderTable() {
+    const idx = jsonBuilderTables.length + 1
+    setJsonBuilderTables([...jsonBuilderTables, { name: `table_${idx}`, columns: [], pk: [] }])
+  }
   function removeTable(i: number) {
     setTables(tables.filter((_, idx) => idx !== i))
+  }
+  function removeJsonBuilderTable(i: number) {
+    setJsonBuilderTables(jsonBuilderTables.filter((_, idx) => idx !== i))
   }
   function updateTableName(i: number, name: string) {
     const next = [...tables]
     next[i] = { ...next[i], name }
     setTables(next)
   }
+  function updateJsonBuilderTableName(i: number, name: string) {
+    const next = [...jsonBuilderTables]
+    next[i] = { ...next[i], name }
+    setJsonBuilderTables(next)
+  }
   function addColumn(i: number) {
     const next = [...tables]
     next[i] = { ...next[i], columns: [...next[i].columns, { name: `col_${next[i].columns.length + 1}`, dtype: 'text', nullable: true }] }
     setTables(next)
   }
+  function addJsonBuilderColumn(i: number) {
+    const next = [...jsonBuilderTables]
+    next[i] = { ...next[i], columns: [...next[i].columns, { name: `col_${next[i].columns.length + 1}`, dtype: 'text', nullable: true }] }
+    setJsonBuilderTables(next)
+  }
   function removeColumn(i: number, j: number) {
     const next = [...tables]
     next[i] = { ...next[i], columns: next[i].columns.filter((_, idx) => idx !== j) }
     setTables(next)
+  }
+  function removeJsonBuilderColumn(i: number, j: number) {
+    const next = [...jsonBuilderTables]
+    next[i] = { ...next[i], columns: next[i].columns.filter((_, idx) => idx !== j) }
+    setJsonBuilderTables(next)
   }
   function updateColumn(i: number, j: number, patch: Partial<EntityTable['columns'][number]>) {
     const next = [...tables]
@@ -162,6 +194,13 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     cols[j] = { ...cols[j], ...patch }
     next[i] = { ...next[i], columns: cols }
     setTables(next)
+  }
+  function updateJsonBuilderColumn(i: number, j: number, patch: Partial<EntityTable['columns'][number]>) {
+    const next = [...jsonBuilderTables]
+    const cols = [...next[i].columns]
+    cols[j] = { ...cols[j], ...patch }
+    next[i] = { ...next[i], columns: cols }
+    setJsonBuilderTables(next)
   }
   function togglePk(i: number, colName: string) {
     const next = [...tables]
@@ -171,10 +210,21 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     next[i] = { ...next[i], pk: Array.from(pk) }
     setTables(next)
   }
+  function toggleJsonBuilderPk(i: number, colName: string) {
+    const next = [...jsonBuilderTables]
+    const pk = new Set(next[i].pk || [])
+    if (pk.has(colName)) pk.delete(colName)
+    else pk.add(colName)
+    next[i] = { ...next[i], pk: Array.from(pk) }
+    setJsonBuilderTables(next)
+  }
 
   function currentTables(): EntityTable[] | null {
     if (tab === 'ddl') return ddlTables
-    if (tab === 'json') return jsonTables
+    if (tab === 'json') {
+      if (jsonMode === 'build') return jsonBuilderTables
+      return jsonTables
+    }
     return tables
   }
 
@@ -263,22 +313,112 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
           </Tab>
           <Tab eventKey="json" title="JSON">
             <div className="pt-3">
-              <Form.Group controlId="jsonText" className="mb-2">
-                <Form.Label>Paste normalized schema JSON</Form.Label>
-                <Form.Control as="textarea" rows={10} value={jsonText} onChange={(e) => setJsonText(e.target.value)} placeholder='{"tables": [{"name": "...", "columns": [...]}]}' />
-              </Form.Group>
-              <div className="d-flex align-items-center gap-2">
-                <Button variant="secondary" onClick={handleValidateJSON} disabled={jsonValidating}>
-                  {jsonValidating ? (
-                    <>
-                      <Spinner animation="border" size="sm" /> Validating...
-                    </>
-                  ) : (
-                    'Validate'
-                  )}
-                </Button>
-                {jsonTables && <small className="text-success">Detected {jsonTables.length} tables</small>}
+              <div className="mb-3">
+                <Form.Check
+                  inline
+                  type="radio"
+                  label="Paste JSON"
+                  name="jsonMode"
+                  checked={jsonMode === 'paste'}
+                  onChange={() => setJsonMode('paste')}
+                />
+                <Form.Check
+                  inline
+                  type="radio"
+                  label="Build JSON"
+                  name="jsonMode"
+                  checked={jsonMode === 'build'}
+                  onChange={() => setJsonMode('build')}
+                />
               </div>
+              
+              {jsonMode === 'paste' ? (
+                <>
+                  <Form.Group controlId="jsonText" className="mb-2">
+                    <Form.Label>Paste normalized schema JSON</Form.Label>
+                    <Form.Control as="textarea" rows={10} value={jsonText} onChange={(e) => setJsonText(e.target.value)} placeholder='{"tables": [{"name": "...", "columns": [...]}]}' />
+                  </Form.Group>
+                  <div className="d-flex align-items-center gap-2">
+                    <Button variant="secondary" onClick={handleValidateJSON} disabled={jsonValidating}>
+                      {jsonValidating ? (
+                        <>
+                          <Spinner animation="border" size="sm" /> Validating...
+                        </>
+                      ) : (
+                        'Validate'
+                      )}
+                    </Button>
+                    {jsonTables && <small className="text-success">Detected {jsonTables.length} tables</small>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <strong>JSON Schema Builder</strong>
+                    <Button size="sm" onClick={addJsonBuilderTable}>Add table</Button>
+                  </div>
+                  {jsonBuilderTables.map((t, i) => (
+                    <div key={i} className="mb-3 p-2 border rounded">
+                      <div className="d-flex align-items-center gap-2 mb-2">
+                        <InputGroup>
+                          <InputGroup.Text>Table</InputGroup.Text>
+                          <Form.Control value={t.name} onChange={(e) => updateJsonBuilderTableName(i, e.target.value)} />
+                        </InputGroup>
+                        <Button variant="outline-danger" size="sm" onClick={() => removeJsonBuilderTable(i)}>
+                          Remove
+                        </Button>
+                        <Button variant="outline-secondary" size="sm" onClick={() => addJsonBuilderColumn(i)}>
+                          Add column
+                        </Button>
+                      </div>
+                      <Table size="sm" bordered>
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Nullable</th>
+                            <th>PK</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {t.columns.map((c, j) => (
+                            <tr key={j}>
+                              <td>
+                                <Form.Control value={c.name} onChange={(e) => updateJsonBuilderColumn(i, j, { name: e.target.value })} />
+                              </td>
+                              <td>
+                                <Form.Select value={c.dtype} onChange={(e) => updateJsonBuilderColumn(i, j, { dtype: e.target.value })}>
+                                  <option value="uuid">uuid</option>
+                                  <option value="text">text</option>
+                                  <option value="varchar">varchar</option>
+                                  <option value="int">int</option>
+                                  <option value="bigint">bigint</option>
+                                  <option value="numeric">numeric</option>
+                                  <option value="timestamp">timestamp</option>
+                                  <option value="date">date</option>
+                                  <option value="bool">bool</option>
+                                </Form.Select>
+                              </td>
+                              <td>
+                                <Form.Check type="switch" checked={c.nullable} onChange={(e) => updateJsonBuilderColumn(i, j, { nullable: e.target.checked })} />
+                              </td>
+                              <td>
+                                <Form.Check type="checkbox" checked={(t.pk || []).includes(c.name)} onChange={() => toggleJsonBuilderPk(i, c.name)} />
+                              </td>
+                              <td>
+                                <Button variant="outline-danger" size="sm" onClick={() => removeJsonBuilderColumn(i, j)}>
+                                  Remove
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </Tab>
           <Tab eventKey="fields" title="Fields">

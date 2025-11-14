@@ -98,3 +98,13 @@ export function useMarkModelDefault(projectId: string, providerId: string) {
     },
   })
 }
+
+export function useMarkModelDefaultWithTask(projectId: string, providerId: string, taskType: 'chat' | 'embeddings' | 'tools') {
+  const qc = useQueryClient()
+  return useMutation<LLMModel, unknown, LLMModel>({
+    mutationFn: (model) => markModelDefault(projectId, providerId, model, { task_type: taskType }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: modelsKey(projectId, providerId) })
+    },
+  })
+}

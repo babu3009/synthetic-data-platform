@@ -65,9 +65,12 @@ class Project(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False, index=True)
-    owner = Column(String(255), nullable=False, index=True)
+    description = Column(String(1000), nullable=True)
+    # New: owner as user FK (prefer this over owner email)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.users.id"), nullable=True, index=True)
     tags = Column(JSONB, default=list, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
     # Settings
     webhook_run_status_url = Column(String(2048), nullable=True)
     artifact_ttl_days = Column(Integer, nullable=True)
@@ -77,6 +80,20 @@ class Project(Base):
     requests = relationship("Request", back_populates="project", cascade="all, delete-orphan")
     api_keys = relationship("ApiKey", back_populates="project", cascade="all, delete-orphan")
     audit_events = relationship("AuditEvent", back_populates="project", cascade="all, delete-orphan")
+    # Optional relationship to owner user for read-only access to email
+    owner_user = relationship("User", foreign_keys=[owner_user_id], viewonly=True)
+
+    @property
+    def owner(self) -> Optional[str]:
+        try:
+            return getattr(self.owner_user, "email", None)
+        except Exception:
+            return None
+
+    def __init__(self, **kwargs):
+        # Absorb legacy 'owner' kwarg for backward compatibility
+        kwargs.pop("owner", None)
+        super().__init__(**kwargs)
 
 
 class Source(Base):
@@ -132,8 +149,8 @@ class Request(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
-    type = Column(Enum(RequestType), nullable=False, index=True)
-    status = Column(Enum(RequestStatus), default=RequestStatus.PENDING, nullable=False, index=True)
+    type = Column(Enum(RequestType, values_callable=lambda e: [m.value for m in e]), nullable=False, index=True)
+    status = Column(Enum(RequestStatus, values_callable=lambda e: [m.value for m in e]), default=RequestStatus.PENDING, nullable=False, index=True)
     seed = Column(Integer, nullable=True)
     params_json = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -168,7 +185,7 @@ class Artifact(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     request_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.requests.id"), nullable=False, index=True)
-    format = Column(Enum(ArtifactFormat), nullable=False, index=True)
+    format = Column(Enum(ArtifactFormat, values_callable=lambda e: [m.value for m in e]), nullable=False, index=True)
     storage_uri = Column(String(2048), nullable=False)
     size_bytes = Column(BigInteger, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -224,8 +241,9 @@ class ProjectMember(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
-    user_sub = Column(String(255), nullable=False, index=True)
-    role = Column(Enum(ProjectRole), nullable=False, index=True)
+    # New: membership by concrete user id (preferred; NOT NULL in migration)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.users.id"), nullable=True, index=True)
+    role = Column(Enum(ProjectRole, values_callable=lambda e: [m.value for m in e]), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
@@ -253,8 +271,8 @@ class User(Base):
     email = Column(String(320), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     organization = Column(String(255), nullable=True)
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER, index=True)
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING_EMAIL_VERIFICATION, index=True)
+    role = Column(Enum(UserRole, values_callable=lambda e: [m.value for m in e]), nullable=False, default=UserRole.USER, index=True)
+    status = Column(Enum(UserStatus, values_callable=lambda e: [m.value for m in e]), nullable=False, default=UserStatus.PENDING_EMAIL_VERIFICATION, index=True)
     profile_image_url = Column(String(1024), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -266,6 +284,12 @@ class EmailOTPPurpose(str, enum.Enum):
     FORGOT_PWD = "forgot_pwd"
     CHANGE_PWD = "change_pwd"
 
+    # Ensure SQLAlchemy / driver bindings use the lowercase .value rather than the Enum name.
+    # Without this, str(member) produced the enum qualified name (e.g. 'EmailOTPPurpose.EMAIL_VERIFY'),
+    # leading the PostgreSQL enum binder to send 'EMAIL_VERIFY' which is not a valid label.
+    def __str__(self) -> str:  # pragma: no cover - trivial
+        return self.value
+
 
 class EmailOTP(Base):
     __tablename__ = "email_otps"
@@ -273,7 +297,8 @@ class EmailOTP(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.users.id"), nullable=False, index=True)
-    purpose = Column(Enum(EmailOTPPurpose), nullable=False, index=True)
+    # Revert to native enum; rely on __str__ override + values_callable for consistent lowercase binding
+    purpose = Column(Enum(EmailOTPPurpose, name="emailotppurpose", values_callable=lambda obj: [e.value for e in obj]), nullable=False, index=True)
     otp_hash = Column(String(128), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
@@ -291,6 +316,19 @@ class LLMProviderKind(str, enum.Enum):
     LMSTUDIO = "lmstudio"
     CUSTOM = "custom"
 
+    def __str__(self) -> str:  # pragma: no cover
+        return self.value
+
+
+class LLMTaskType(str, enum.Enum):
+    """Task types for which a provider can have distinct default models.
+
+    Keep values lowercase to align with enum/value conventions in this codebase.
+    """
+    CHAT = "chat"
+    EMBEDDINGS = "embeddings"
+    TOOLS = "tools"
+
 
 class LLMProvider(Base):
     __tablename__ = "llm_providers"
@@ -298,15 +336,32 @@ class LLMProvider(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Align enum type name with migrations to avoid driver cast issues
-    kind = Column(Enum(LLMProviderKind, name="llm_provider_kind"), nullable=False, index=True)
+    # Use values_callable to ensure lowercase .value strings are bound (avoids uppercase enum names reaching DB)
+    kind = Column(Enum(LLMProviderKind, name="llm_provider_kind", values_callable=lambda enum: [e.value for e in enum]), nullable=False, index=True)
     name = Column(String(255), nullable=False, unique=True, index=True)
     base_url = Column(String(1024), nullable=True)
     is_enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Denormalized pointer to the current default model for this provider (nullable)
+    default_model_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_models.id"), nullable=True, index=True)
 
     credentials = relationship("LLMCredential", back_populates="provider", cascade="all, delete-orphan")
-    models = relationship("LLMModel", back_populates="provider", cascade="all, delete-orphan")
+    # Disambiguate relationship since there are two FKs between providers and models
+    models = relationship(
+        "LLMModel",
+        back_populates="provider",
+        cascade="all, delete-orphan",
+        foreign_keys="LLMModel.provider_id",
+        primaryjoin="LLMProvider.id==LLMModel.provider_id",
+    )
+    # Optional relationship to the default model record
+    default_model = relationship(
+        "LLMModel",
+        foreign_keys=[default_model_id],
+        viewonly=True,
+        primaryjoin="LLMProvider.default_model_id==LLMModel.id",
+    )
 
 
 class LLMCredential(Base):
@@ -335,7 +390,31 @@ class LLMModel(Base):
     metadata_json = Column(JSONB, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    provider = relationship("LLMProvider", back_populates="models")
+    # Disambiguate the many-to-one backref to provider
+    provider = relationship(
+        "LLMProvider",
+        back_populates="models",
+        foreign_keys=[provider_id],
+        primaryjoin="LLMProvider.id==LLMModel.provider_id",
+    )
+
+
+class LLMProviderTaskDefault(Base):
+    """Per-task default model selection for an LLM provider.
+
+    Enforces a single default model per (provider, task_type).
+    """
+    __tablename__ = "llm_provider_task_defaults"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_providers.id"), nullable=False, index=True)
+    task_type = Column(Enum(LLMTaskType, name="llm_task_type", values_callable=lambda e: [m.value for m in e]), nullable=False, index=True)
+    model_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.llm_models.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    provider = relationship("LLMProvider")
+    model = relationship("LLMModel")
 
 
 class ProjectLLMSetting(Base):

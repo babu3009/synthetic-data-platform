@@ -6,20 +6,19 @@ import { useToasts } from '../../hooks/use_toasts'
 
 const ProjectCreatePage: React.FC = () => {
   const [name, setName] = React.useState('')
-  const [owner, setOwner] = React.useState('')
   const [webhookUrl, setWebhookUrl] = React.useState('')
   const navigate = useNavigate()
   const { push } = useToasts()
   const qc = useQueryClient()
 
   const mut = useMutation({
-    mutationFn: () => createProject({ name, owner, webhook_run_status_url: webhookUrl || undefined }),
+    mutationFn: () => createProject({ name, webhook_run_status_url: webhookUrl || undefined }),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['projects.all'] })
-  const prev = qc.getQueryData<unknown>(['projects.all']) as Array<{ id:string; name:string; owner:string; webhook_run_status_url?:string|null; created_at?:string }> | undefined
+  const prev = qc.getQueryData<unknown>(['projects.all']) as Array<{ id:string; name:string; webhook_run_status_url?:string|null; created_at?:string }> | undefined
       // optimistic: add a temp item
       const tempId = 'temp-' + Date.now()
-  const optimistic = [...(prev || []), { id: tempId, name, owner, webhook_run_status_url: webhookUrl || null, created_at: new Date().toISOString() }]
+  const optimistic = [...(prev || []), { id: tempId, name, webhook_run_status_url: webhookUrl || null, created_at: new Date().toISOString() }]
       qc.setQueryData(['projects.all'], optimistic)
       return { prev }
     },
@@ -50,10 +49,7 @@ const ProjectCreatePage: React.FC = () => {
           <label htmlFor="pname" className="form-label">Name</label>
           <input id="pname" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
-        <div className="mb-3">
-          <label htmlFor="powner" className="form-label">Owner</label>
-          <input id="powner" className="form-control" value={owner} onChange={(e) => setOwner(e.target.value)} required />
-        </div>
+        {/* Owner is inferred from the authenticated user; no explicit input */}
         <div className="mb-3">
           <label htmlFor="pwebhook" className="form-label">Run Status Webhook URL (optional)</label>
           <input id="pwebhook" className="form-control" type="url" placeholder="https://example.com/webhook" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} />

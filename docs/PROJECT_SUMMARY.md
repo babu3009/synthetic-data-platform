@@ -110,6 +110,13 @@ synthetic-data-platform/
 - Cross-platform setup scripts (Windows + Unix)
 
 ### 4. Production Ready
+### 5. Sources Ingestion & Listing
+- Upload DDL (`.sql`/`.ddl`) or canonical JSON schemas per project.
+- Automatic parsing (tables, columns, PK/FK, uniques, checks) with heuristic PII tagging.
+- Lightweight listing endpoint (`GET /api/v1/projects/{project_id}/sources`) showing kind, created_at, checksum.
+- Detailed schema view (`GET /api/v1/projects/{project_id}/sources/{source_id}`) plus DAG and tables sub-endpoints for targeted data.
+- React UI pages: Sources list, Schema view, DAG visualization (ReactFlow auto-layout).
+
 - Docker images for both frontend and backend
 - Automated CI/CD pipeline
 - Security scanning

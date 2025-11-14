@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):  # pragma: no cover - integration path
             _cleanup_task.cancel()
             try:
                 await _cleanup_task
-            except Exception:
+            except BaseException:
                 pass
 
 
@@ -94,15 +94,19 @@ async def _run_cleanup_periodically(interval_minutes: int) -> None:
     # Sleep a bit after startup to avoid contention
     await asyncio.sleep(5)
     interval = max(1, int(interval_minutes)) * 60
-    while True:
-        try:
-            # Run sync cleanup in a thread to avoid blocking the event loop
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, cleanup_expired_artifacts)
-        except Exception:
-            # Best-effort only; ignore errors
-            pass
-        await asyncio.sleep(interval)
+    try:
+        while True:
+            try:
+                # Run sync cleanup in a thread to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, cleanup_expired_artifacts)
+            except Exception:
+                # Best-effort only; ignore errors
+                pass
+            await asyncio.sleep(interval)
+    except BaseException:
+        # Graceful task cancellation on shutdown/reload
+        return
 
 
 

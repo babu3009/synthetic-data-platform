@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../state/use_auth'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useToasts } from '../../hooks/use_toasts'
+import { fetchOidcAuthorize } from '../../services/auth'
 
 const LoginPage: React.FC = () => {
   const { login, loading } = useAuth()
@@ -11,6 +12,8 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [ssoError, setSsoError] = useState<string | null>(null)
+  const [ssoLoading, setSsoLoading] = useState(false)
 
   useEffect(() => {
     const prefill = searchParams.get('email')
@@ -28,6 +31,29 @@ const LoginPage: React.FC = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
       setError(msg)
+    }
+  }
+
+  async function handleSsoStart() {
+    setSsoError(null)
+    setSsoLoading(true)
+    try {
+      const res = await fetchOidcAuthorize()
+      if (!res.enabled) {
+        setSsoError('Single Sign-On is not configured')
+        return
+      }
+      if (!res.authorize_url) {
+        setSsoError('Authorization URL missing from server')
+        return
+      }
+      // Redirect to the IdP authorization URL
+      window.location.href = res.authorize_url
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start SSO'
+      setSsoError(msg)
+    } finally {
+      setSsoLoading(false)
     }
   }
 
@@ -60,7 +86,11 @@ const LoginPage: React.FC = () => {
           />
         </div>
         {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
-        <button type="submit" className="btn btn-primary" disabled={loading}> {loading ? 'Logging in...' : 'Login'} </button>
+        <button type="submit" className="btn btn-primary me-2" disabled={loading}> {loading ? 'Logging in...' : 'Login'} </button>
+        <button type="button" className="btn btn-outline-secondary" onClick={handleSsoStart} disabled={ssoLoading} aria-label="Continue with SSO">
+          {ssoLoading ? 'Redirecting…' : 'Continue with SSO'}
+        </button>
+        {ssoError && <div className="alert alert-warning py-2 mt-2" role="alert">{ssoError}</div>}
         <div className="mt-3">
           <a href="/forgot-password">Forgot password?</a>
         </div>

@@ -158,6 +158,19 @@ Use `-DryRun` to validate/parse without writing outputs.
 - **Backend API**: http://localhost:8000
   - Health check: http://localhost:8000/health
   - API docs: http://localhost:8000/docs
+   - Sources ingestion & listing:
+      - `POST /api/v1/projects/{project_id}/sources` (upload DDL .sql/.ddl or canonical JSON)
+      - `GET /api/v1/projects/{project_id}/sources` (list ingested sources; supports skip/limit)
+      - `GET /api/v1/projects/{project_id}/sources/{source_id}` (canonical schema + DAG)
+      - `GET /api/v1/projects/{project_id}/sources/{source_id}/dag` (FK graph only)
+      - `GET /api/v1/projects/{project_id}/sources/{source_id}/tables` (tables array only)
+   - Project API Keys (OWNER only):
+      - `GET /api/v1/projects/{project_id}/api-keys` (list keys; masked)
+      - `POST /api/v1/projects/{project_id}/api-keys` (create; returns plaintext once)
+      - `DELETE /api/v1/projects/{project_id}/api-keys/{key_id}` (revoke)
+         - `GET /api/v1/projects/{project_id}/api-keys/scopes` (enumerate available scopes)
+
+   Security note: API key plaintext is shown only once at creation time and is never stored; the backend persists only a SHA-256 hash (peppered with `SECRET_KEY`).
 - **Frontend**: http://localhost:3000
 - **PostgreSQL**: localhost:5432
 - **Redis**: localhost:6379

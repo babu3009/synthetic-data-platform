@@ -104,6 +104,14 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
             )}
           </InputGroup>
         </div>
+        <div className="small text-muted mb-1 d-flex justify-content-between align-items-center px-1">
+          <span>Columns</span>
+          <span className="text-end">
+            <OverlayTrigger placement="top" overlay={<Tooltip>Click column name to toggle PK</Tooltip>}>
+              <span role="img" aria-label="Primary Key indicator">🔑 = PK</span>
+            </OverlayTrigger>
+          </span>
+        </div>
         <ul
           className="list-unstyled mb-0"
           role="listbox"
@@ -122,16 +130,22 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
                 role="button"
                 aria-label={`Toggle primary key for ${c.name}`}
                 onClick={() => data.onTogglePk(c.name)}
+                style={{ cursor: 'pointer' }}
               >
                 <Handle id={`in-${t.name}-${c.name}`} type="target" position={Position.Left} className="handle-in" />
-                <span>{c.name}</span>
-                {pk.has(c.name) && (
-                  <OverlayTrigger placement="top" overlay={<Tooltip>Primary key</Tooltip>}>
-                    <Badge bg="warning" text="dark" aria-label="Primary key">
-                      <KeyIcon />
-                    </Badge>
-                  </OverlayTrigger>
-                )}
+                <OverlayTrigger 
+                  placement="top" 
+                  overlay={<Tooltip>Click to {pk.has(c.name) ? 'remove from' : 'set as'} primary key</Tooltip>}
+                >
+                  <div className="d-flex align-items-center gap-1">
+                    <span>{c.name}</span>
+                    {pk.has(c.name) && (
+                      <Badge bg="warning" text="dark" aria-label="Primary key">
+                        <KeyIcon />
+                      </Badge>
+                    )}
+                  </div>
+                </OverlayTrigger>
                 <small className="text-muted">({c.dtype}{c.nullable ? ', null' : ''})</small>
               </div>
               <div>

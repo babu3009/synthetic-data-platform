@@ -10,7 +10,9 @@ from app.db.models import ProjectRole
 
 
 class ProjectMemberBase(BaseModel):
-    user_sub: str = Field(..., min_length=1, max_length=255)
+    # Preferred: user_id; Deprecated: user_sub (email). At least one should be provided.
+    user_id: Optional[UUID] = None
+    user_sub: Optional[str] = Field(default=None, min_length=1, max_length=255)
     role: ProjectRole
 
 

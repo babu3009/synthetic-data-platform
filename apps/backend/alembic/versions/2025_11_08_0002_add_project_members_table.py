@@ -7,6 +7,7 @@ Create Date: 2025-11-08
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
+from app.db.base import SCHEMA_NAME
 
 # revision identifiers, used by Alembic.
 revision = "2025_11_08_0002"
@@ -14,7 +15,7 @@ down_revision = "2025_11_07_0001"
 branch_labels = None
 depends_on = None
 
-SCHEMA = "synthetic_data"
+SCHEMA = SCHEMA_NAME
 
 # Define enum for project member roles
 # Use create_type=False to avoid implicit creation during table create; we will

@@ -63,6 +63,7 @@ export type WizardState = {
 type Action =
   | { type: 'setProject'; projectId?: string }
   | { type: 'addEntity'; entity: Omit<EntitySchema, 'id' | 'updatedAt'> & Partial<Pick<EntitySchema, 'id' | 'updatedAt'>> }
+  | { type: 'deleteEntity'; id: string }
   | { type: 'setSelectedEntity'; id?: string }
   | { type: 'setActiveTab'; tab: WizardState['activeTab'] }
   | { type: 'updateEntity'; id: string; patch: Partial<EntitySchema> }
@@ -93,13 +94,25 @@ function reducer(state: WizardState, action: Action): WizardState {
     case 'addEntity': {
       const id = action.entity.id ?? (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now()))
       const updatedAt = action.entity.updatedAt ?? new Date().toISOString()
-      const entity: EntitySchema = { id, updatedAt, name: action.entity.name, tables: action.entity.tables }
+      const entity: EntitySchema = { 
+        id, 
+        updatedAt, 
+        name: action.entity.name, 
+        tables: action.entity.tables,
+        relationships: action.entity.relationships,
+        layout: action.entity.layout,
+      }
       return {
         ...state,
         entities: [entity, ...state.entities.filter((e) => e.id !== id)],
         selectedEntityId: id,
         isDirty: true,
       }
+    }
+    case 'deleteEntity': {
+      const entities = state.entities.filter((e) => e.id !== action.id)
+      const selectedEntityId = state.selectedEntityId === action.id ? undefined : state.selectedEntityId
+      return { ...state, entities, selectedEntityId, isDirty: true }
     }
     case 'setSelectedEntity':
       return { ...state, selectedEntityId: action.id }

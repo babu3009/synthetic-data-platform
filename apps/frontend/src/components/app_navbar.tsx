@@ -79,6 +79,14 @@ function AppNavbar() {
                 Admin Users
               </Nav.Link>
             )}
+              <Nav.Link
+                as={Link}
+                to="/flat/preview"
+                active={/\/flat\/preview$/.test(location.pathname)}
+                aria-label="Flat Preview"
+              >
+                Flat Preview
+              </Nav.Link>
           </Nav>
           <Nav>
             {token ? (

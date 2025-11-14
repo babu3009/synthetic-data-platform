@@ -48,3 +48,25 @@ export async function estimateRequest(projectId: string, requestId: string) {
   const res = await api.post(`/api/v1/projects/${projectId}/requests/${requestId}:estimate`)
   return res.data as { rows?: number; size_bytes?: number; seconds?: number }
 }
+
+export interface ListRequestsOptions {
+  page?: number
+  pageSize?: number
+  search?: string
+}
+
+export async function listRequests(projectId: string, opts: ListRequestsOptions = {}) {
+  const { page = 1, pageSize = 10, search } = opts
+  const params = new URLSearchParams()
+  params.set('skip', String((page - 1) * pageSize))
+  params.set('limit', String(pageSize))
+  if (search && search.trim()) params.set('q', search.trim())
+  const res = await api.get(`/api/v1/projects/${projectId}/requests?${params.toString()}`)
+  return res.data as Request[]
+}
+
+export async function signArtifact(requestId: string, artifactId: string) {
+  // Backend returns { url: string, expires_at?: string }
+  const res = await api.get(`/api/v1/requests/${requestId}/artifacts/${artifactId}:sign`)
+  return res.data as { url: string; expires_at?: string }
+}

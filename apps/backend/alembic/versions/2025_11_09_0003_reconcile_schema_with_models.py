@@ -7,6 +7,8 @@ Create Date: 2025-11-09
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import text
+from app.db.base import SCHEMA_NAME
 
 
 # revision identifiers, used by Alembic.
@@ -15,37 +17,24 @@ down_revision = "2025_11_08_0002"
 branch_labels = None
 depends_on = None
 
-SCHEMA = "synthetic_data"
+SCHEMA = SCHEMA_NAME
 
 
 def upgrade() -> None:
-    # 1) requests.seed column
-    op.add_column(
-        "requests",
-        sa.Column("seed", sa.Integer(), nullable=True),
-        schema=SCHEMA,
-    )
+    # 1) requests.seed column (idempotent)
+    op.execute(text(f"ALTER TABLE {SCHEMA}.requests ADD COLUMN IF NOT EXISTS seed INTEGER"))
 
     # 2) artifacts.storage_path -> storage_uri
     with op.batch_alter_table("artifacts", schema=SCHEMA) as batch_op:
-        batch_op.alter_column("storage_path", new_column_name="storage_uri")
+        try:
+            batch_op.alter_column("storage_path", new_column_name="storage_uri")
+        except Exception:
+            # Column may already be renamed
+            pass
 
     # 3) configs: add version/body_json and relax legacy columns to nullable
-    op.add_column(
-        "configs",
-        sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
-        schema=SCHEMA,
-    )
-    op.add_column(
-        "configs",
-        sa.Column(
-            "body_json",
-            postgresql.JSONB(astext_type=sa.Text()),
-            nullable=False,
-            server_default=sa.text("'{}'::jsonb"),
-        ),
-        schema=SCHEMA,
-    )
+    op.execute(text(f"ALTER TABLE {SCHEMA}.configs ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1 NOT NULL"))
+    op.execute(text(f"ALTER TABLE {SCHEMA}.configs ADD COLUMN IF NOT EXISTS body_json JSONB DEFAULT '{{}}'::jsonb NOT NULL"))
 
     with op.batch_alter_table("configs", schema=SCHEMA) as batch_op:
         for col in ("llm_provider", "llm_model", "generation_strategy"):

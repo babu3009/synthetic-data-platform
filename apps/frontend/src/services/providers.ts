@@ -17,11 +17,19 @@ export type ProviderSuggestion = {
   providerConfig?: Record<string, unknown>
   pii?: boolean
   piiSubtype?: 'email' | 'phone' | 'address' | 'national_id' | 'credit_card' | 'dob' | 'ip' | 'device'
+  confidence?: number // 0..1 confidence score (optional)
+  reason?: string // optional rationale/explanation
 }
 
 export async function inferProviders(projectId: string, entity: EntitySchema, headers?: Record<string, string>) {
   // Backend: try /api/v1 path; if it fails, propagate error
   const res = await api.post(`/api/v1/projects/${projectId}/infer/providers`, { entity }, { headers })
+  return (res.data?.suggestions || []) as ProviderSuggestion[]
+}
+
+// Optional non-scoped alias for public/trial mode
+export async function inferProvidersAlias(entity: EntitySchema, headers?: Record<string, string>) {
+  const res = await api.post(`/api/v1/infer/providers`, { entity }, { headers })
   return (res.data?.suggestions || []) as ProviderSuggestion[]
 }
 

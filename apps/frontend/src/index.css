@@ -46,6 +46,30 @@ code {
 }
 
 /* Admin LLM Providers table tweaks */
+.default-model-name {
+  max-width: 160px;
+  display: inline-block;
+  vertical-align: middle;
+}
 td[data-maxwidth="320"] {
   max-width: 320px;
+}
+
+/* Utility container for ReactFlow canvases */
+.rf-container-580 {
+  height: 580px;
+}
+
+/* Utility: select all text (avoid inline style) */
+.select-all {
+  -webkit-user-select: all; /* Safari */
+  user-select: all;
+}
+
+/* Fixed width utility for small search inputs */
+.w-240 { max-width:240px; }
+
+/* Utility for preformatted text wrapping without inline styles */
+.pre-wrap {
+  white-space: pre-wrap;
 }

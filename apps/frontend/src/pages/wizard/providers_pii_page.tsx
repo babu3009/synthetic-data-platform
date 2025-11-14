@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip } from 'react-bootstrap'
+import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip, Popover } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
 import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
 import { autosaveEntity } from '../../services/entities'
@@ -39,6 +39,9 @@ function SuggestionsDiffModal({
     column: string
     before: Partial<Column>
     after: Partial<Column>
+    confidence?: number
+    reason?: string
+    manualOverride?: boolean
   }>
   onConfirm: () => void
 }) {
@@ -56,23 +59,69 @@ function SuggestionsDiffModal({
               <tr>
                 <th>Table</th>
                 <th>Column</th>
-                <th>Before</th>
-                <th>After</th>
+                <th>Change</th>
+                <th>Confidence</th>
               </tr>
             </thead>
             <tbody>
-              {diffs.map((d, i) => (
-                <tr key={i}>
-                  <td>{d.table}</td>
-                  <td>{d.column}</td>
-                  <td>
-                    <code>{JSON.stringify(d.before)}</code>
-                  </td>
-                  <td>
-                    <code>{JSON.stringify(d.after)}</code>
-                  </td>
-                </tr>
-              ))}
+              {diffs.map((d, i) => {
+                const changes: Array<JSX.Element> = []
+                if (d.before.provider !== d.after.provider) {
+                  changes.push(
+                    <div key="prov">
+                      <strong>provider:</strong> <code>{String(d.before.provider ?? '(none)')}</code> →{' '}
+                      <code>{String(d.after.provider ?? '(none)')}</code>
+                    </div>
+                  )
+                }
+                if (JSON.stringify(d.before.providerConfig ?? null) !== JSON.stringify(d.after.providerConfig ?? null)) {
+                  changes.push(
+                    <div key="cfg">
+                      <strong>config:</strong> <code>{JSON.stringify(d.before.providerConfig ?? {})}</code> →{' '}
+                      <code>{JSON.stringify(d.after.providerConfig ?? {})}</code>
+                    </div>
+                  )
+                }
+                if (d.before.pii !== d.after.pii) {
+                  changes.push(
+                    <div key="pii">
+                      <strong>pii:</strong> <code>{String(d.before.pii ?? false)}</code> →{' '}
+                      <code>{String(d.after.pii ?? false)}</code>
+                    </div>
+                  )
+                }
+                if (d.before.piiSubtype !== d.after.piiSubtype) {
+                  changes.push(
+                    <div key="piisub">
+                      <strong>piiSubtype:</strong> <code>{String(d.before.piiSubtype ?? '(none)')}</code> →{' '}
+                      <code>{String(d.after.piiSubtype ?? '(none)')}</code>
+                    </div>
+                  )
+                }
+                return (
+                  <tr key={i}>
+                    <td>{d.table}</td>
+                    <td>
+                      {d.column}
+                      {d.manualOverride && (
+                        <span className="ms-2 badge bg-warning text-dark" title="This will overwrite a manual selection">
+                          overwrites manual
+                        </span>
+                      )}
+                    </td>
+                    <td>{changes.length > 0 ? changes : <span className="text-muted">(no field changes)</span>}</td>
+                    <td>
+                      {typeof d.confidence === 'number' ? (
+                        <OverlayTrigger placement="left" overlay={<Tooltip>{d.reason || 'suggestion'}</Tooltip>}>
+                          <span className="badge bg-info text-dark">{Math.round(d.confidence * 100)}%</span>
+                        </OverlayTrigger>
+                      ) : (
+                        <span className="text-muted">n/a</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </Table>
         )}
@@ -97,9 +146,12 @@ export default function ProvidersPiiPage() {
   const [saving, setSaving] = useState(false)
   const [loadingSuggest, setLoadingSuggest] = useState(false)
   const [diffs, setDiffs] = useState<
-    Array<{ table: string; column: string; before: Partial<Column>; after: Partial<Column> }>
+    Array<{ table: string; column: string; before: Partial<Column>; after: Partial<Column>; confidence?: number; reason?: string; manualOverride?: boolean }>
   >([])
   const [showDiff, setShowDiff] = useState(false)
+  const [lastChangesCount, setLastChangesCount] = useState<number | null>(null)
+  const [suggestionsByKey, setSuggestionsByKey] = useState<Record<string, ProviderSuggestion>>({})
+  const [summaryCounts, setSummaryCounts] = useState<{ providers: number; pii: number } | null>(null)
 
   const projectId = state.projectId || 'default'
 
@@ -166,7 +218,10 @@ export default function ProvidersPiiPage() {
     setError(null)
     try {
       const suggestions = (await inferProviders(projectId, entity)) as ProviderSuggestion[]
-      const diffs: Array<{ table: string; column: string; before: Partial<Column>; after: Partial<Column> }> = []
+      const diffs: Array<{ table: string; column: string; before: Partial<Column>; after: Partial<Column>; confidence?: number; reason?: string; manualOverride?: boolean }> = []
+      const map: Record<string, ProviderSuggestion> = {}
+      let providerChanges = 0
+      let piiUpdates = 0
       for (const s of suggestions) {
         const t = entity.tables.find((tt) => tt.name === s.table)
         const c = t?.columns.find((cc) => cc.name === s.column)
@@ -183,14 +238,36 @@ export default function ProvidersPiiPage() {
           pii: typeof s.pii === 'boolean' ? s.pii : c.pii,
           piiSubtype: s.piiSubtype ?? c.piiSubtype,
         }
-        if (JSON.stringify(before) !== JSON.stringify(after)) diffs.push({ table: s.table, column: s.column, before, after })
+        const changed = JSON.stringify(before) !== JSON.stringify(after)
+        if (changed) {
+          const manualOverride = Boolean(
+            (c.provider && s.provider && s.provider !== c.provider) ||
+              (c.providerConfig && JSON.stringify(c.providerConfig) !== JSON.stringify(s.providerConfig ?? c.providerConfig)) ||
+              (typeof s.pii === 'boolean' && s.pii !== c.pii) ||
+              (s.piiSubtype && s.piiSubtype !== c.piiSubtype)
+          )
+          diffs.push({ table: s.table, column: s.column, before, after, confidence: s.confidence, reason: s.reason, manualOverride })
+          const key = `${s.table}.${s.column}`
+          map[key] = s
+          if ((before.provider !== after.provider) || (JSON.stringify(before.providerConfig ?? null) !== JSON.stringify(after.providerConfig ?? null))) providerChanges++
+          if ((before.pii !== after.pii) || (before.piiSubtype !== after.piiSubtype)) piiUpdates++
+        }
       }
       setDiffs(diffs)
+      setLastChangesCount(diffs.length)
       setShowDiff(true)
+      setSuggestionsByKey(map)
+      setSummaryCounts({ providers: providerChanges, pii: piiUpdates })
     } catch (e: unknown) {
-      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      const msg = e instanceof Error ? e.message : undefined
-      setError(detail || msg || 'Failed to infer providers')
+      const res = (e as { response?: { status?: number; data?: { detail?: string } } })?.response
+      const status = res?.status
+      if (status === 429) {
+        setError('Rate limit exceeded for provider inference. Please wait a few seconds and try again.')
+      } else {
+        const detail = res?.data?.detail
+        const msg = e instanceof Error ? e.message : undefined
+        setError(detail || msg || 'Failed to infer providers')
+      }
     } finally {
       setLoadingSuggest(false)
     }
@@ -208,6 +285,47 @@ export default function ProvidersPiiPage() {
       piiSubtype: d.after.piiSubtype,
     }))
     dispatch({ type: 'applyProviderSuggestions', entityId: entity.id, suggestions })
+  }
+
+  // Apply a single row suggestion
+  function applySuggestion(tableName: string, col: Column) {
+    const key = `${tableName}.${col.name}`
+    const s = suggestionsByKey[key]
+    if (!s) return
+    const patch: Partial<Column> = {
+      provider: (s.provider ?? col.provider) as Column['provider'],
+      providerConfig: s.providerConfig ?? col.providerConfig,
+      pii: typeof s.pii === 'boolean' ? s.pii : col.pii,
+      piiSubtype: (s.piiSubtype ?? col.piiSubtype) as Column['piiSubtype'],
+    }
+    dispatch({ type: 'updateColumn', entityId: entity.id, tableName, columnName: col.name, patch })
+    // Remove this suggestion and recompute summary
+    const newMap = { ...suggestionsByKey }
+    delete newMap[key]
+    setSuggestionsByKey(newMap)
+    // recompute counts vs current entity snapshot
+    setSummaryCounts(prev => {
+      if (!prev) return prev
+      // naive decrement: we don't know whether this was a provider change, pii update, or both; recompute from remaining diffs
+      let providers = 0
+      let pii = 0
+      for (const [k, sug] of Object.entries(newMap)) {
+        const [tName, cName] = k.split('.')
+        const t = entity.tables.find(tt => tt.name === tName)
+        const c = t?.columns.find(cc => cc.name === cName)
+        if (!t || !c) continue
+        const before = { provider: c.provider, providerConfig: c.providerConfig, pii: c.pii, piiSubtype: c.piiSubtype }
+        const after = {
+          provider: sug.provider ?? c.provider,
+          providerConfig: sug.providerConfig ?? c.providerConfig,
+          pii: typeof sug.pii === 'boolean' ? sug.pii : c.pii,
+          piiSubtype: sug.piiSubtype ?? c.piiSubtype,
+        }
+        if ((before.provider !== after.provider) || (JSON.stringify(before.providerConfig ?? null) !== JSON.stringify(after.providerConfig ?? null))) providers++
+        if ((before.pii !== after.pii) || (before.piiSubtype !== after.piiSubtype)) pii++
+      }
+      return { providers, pii }
+    })
   }
 
   async function handleSave() {
@@ -292,12 +410,23 @@ export default function ProvidersPiiPage() {
           </Form.Select>
           <Button variant="secondary" size="sm" onClick={handleSuggest} disabled={loadingSuggest} aria-label="Auto-suggest providers from column metadata">
             {loadingSuggest ? 'Suggesting…' : 'Auto-suggest providers'}
+            {lastChangesCount != null && !loadingSuggest && (
+              <span className="ms-2 badge bg-light text-dark">{lastChangesCount} changes</span>
+            )}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving} aria-label="Save provider and PII settings">
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </div>
+
+      {summaryCounts && (summaryCounts.providers > 0 || summaryCounts.pii > 0) && (
+        <Alert variant="info" className="py-2">
+          <strong>Suggestions summary:</strong>
+          <span className="ms-2">{summaryCounts.providers} provider change{summaryCounts.providers === 1 ? '' : 's'}</span>
+          <span className="ms-3">{summaryCounts.pii} PII update{summaryCounts.pii === 1 ? '' : 's'}</span>
+        </Alert>
+      )}
 
       <Table bordered hover size="sm">
         <thead>
@@ -329,6 +458,7 @@ export default function ProvidersPiiPage() {
                 </OverlayTrigger>
               </div>
             </th>
+            <th>Suggestion</th>
           </tr>
         </thead>
         <tbody>
@@ -430,6 +560,72 @@ export default function ProvidersPiiPage() {
                         </Form.Select>
                       </Col>
                     </Row>
+                  </td>
+                  <td>
+                    {(() => {
+                      const key = `${table}.${column.name}`
+                      const s = suggestionsByKey[key]
+                      if (!s) return <span className="text-muted">—</span>
+                      const pop = (
+                        <Popover id={`why-${idx}`}>
+                          <Popover.Header as="h3">Why this suggestion?</Popover.Header>
+                          <Popover.Body>
+                            <div className="small">{s.reason || 'No additional context.'}</div>
+                          </Popover.Body>
+                        </Popover>
+                      )
+                      return (
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-info text-dark" title="Confidence">{typeof s.confidence === 'number' ? `${Math.round(s.confidence * 100)}%` : 'n/a'}</span>
+                          <OverlayTrigger trigger={["hover", "focus"]} placement="left" overlay={pop}>
+                            <Button variant="outline-secondary" size="sm" aria-label="Why this suggestion?">Why?</Button>
+                          </OverlayTrigger>
+                          {(() => {
+                            const before = { provider: column.provider, providerConfig: column.providerConfig, pii: column.pii, piiSubtype: column.piiSubtype }
+                            const after = {
+                              provider: s.provider ?? column.provider,
+                              providerConfig: s.providerConfig ?? column.providerConfig,
+                              pii: typeof s.pii === 'boolean' ? s.pii : column.pii,
+                              piiSubtype: s.piiSubtype ?? column.piiSubtype,
+                            }
+                            const changedProvider = Boolean(before.provider && s.provider && s.provider !== before.provider)
+                            const changedConfig = Boolean(before.providerConfig && JSON.stringify(before.providerConfig) !== JSON.stringify(after.providerConfig))
+                            const changedPii = typeof s.pii === 'boolean' && s.pii !== before.pii
+                            const changedSubtype = Boolean(s.piiSubtype && s.piiSubtype !== before.piiSubtype)
+                            const overwritesManual = changedProvider || changedConfig || changedPii || changedSubtype
+                            if (!overwritesManual) return null
+
+                            const details: string[] = []
+                            if (changedProvider) details.push(`provider: ${String(before.provider)} → ${String(after.provider)}`)
+                            if (changedConfig) details.push('config: will be updated')
+                            if (changedPii) details.push(`PII: ${String(before.pii)} → ${String(after.pii)}`)
+                            if (changedSubtype) details.push(`PII subtype: ${String(before.piiSubtype ?? 'none')} → ${String(after.piiSubtype ?? 'none')}`)
+
+                            const pop = (
+                              <Popover id={`overwrite-${idx}`}>
+                                <Popover.Header as="h3">Overwrites manual values</Popover.Header>
+                                <Popover.Body>
+                                  <ul className="mb-0 ps-3">
+                                    {details.map((d, i) => (
+                                      <li key={i} className="small">{d}</li>
+                                    ))}
+                                  </ul>
+                                </Popover.Body>
+                              </Popover>
+                            )
+
+                            return (
+                              <OverlayTrigger trigger={["hover", "focus"]} placement="top" overlay={pop}>
+                                <span className="badge bg-warning text-dark" role="button" tabIndex={0} aria-label="Overwrites manual value (show details)">Overwrites manual</span>
+                              </OverlayTrigger>
+                            )
+                          })()}
+                          <Button variant="success" size="sm" onClick={() => applySuggestion(table, column)} aria-label={`Apply suggestion for ${table}.${column.name}`}>
+                            Apply
+                          </Button>
+                        </div>
+                      )
+                    })()}
                   </td>
                 </tr>
               )

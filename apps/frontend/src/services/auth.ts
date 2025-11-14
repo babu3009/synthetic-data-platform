@@ -64,3 +64,28 @@ export async function uploadAvatar(file: File): Promise<{ ok: boolean }> {
   const res = await api.patch('/api/v1/users/me/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
   return res.data
 }
+
+// ---- OIDC SSO Helpers ----
+export interface OidcAuthorizeResponse {
+  enabled: boolean
+  authorize_url?: string
+  reason?: string
+}
+
+export async function fetchOidcAuthorize(): Promise<OidcAuthorizeResponse> {
+  const res = await api.get('/api/v1/auth/login')
+  return res.data as OidcAuthorizeResponse
+}
+
+export interface OidcCallbackResult {
+  verified?: boolean
+  claims?: { sub?: string; email?: string; name?: string }
+  received?: Record<string, string>
+  note?: string
+}
+
+export async function completeOidcCallback(queryString: string): Promise<OidcCallbackResult> {
+  const path = '/api/v1/auth/callback' + (queryString?.startsWith('?') ? queryString : `?${queryString || ''}`)
+  const res = await api.get(path)
+  return res.data as OidcCallbackResult
+}

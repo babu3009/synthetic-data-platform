@@ -6,13 +6,14 @@ Create Date: 2025-11-09
 """
 from alembic import op
 import sqlalchemy as sa
+from app.db.base import SCHEMA_NAME
 
 revision = "2025_11_09_0008"
 down_revision = "2025_11_09_0007"
 branch_labels = None
 depends_on = None
 
-SCHEMA = "synthetic_data"
+SCHEMA = SCHEMA_NAME
 
 project_role_enum_correct = sa.Enum(
     "OWNER", "EDITOR", "VIEWER", name="projectrole", create_type=False

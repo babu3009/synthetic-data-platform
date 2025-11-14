@@ -5,21 +5,28 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import LLMProvider, LLMProviderKind, ProjectLLMSetting, LLMModel, LLMCredential
+from app.db.models import LLMProvider, LLMProviderKind, ProjectLLMSetting, LLMModel, LLMCredential, Project
 from app.services.llm import LLMClientFactory
 from app.utils.crypto import encrypt_json
 
 
 @pytest.mark.asyncio
 async def test_factory_returns_none_when_no_setting(db_session: AsyncSession):
-    project_id = uuid4()
+    # Persist a project row to satisfy FK constraint
+    project = Project(name="proj-disabled")
+    db_session.add(project)
+    await db_session.flush()
+    project_id = project.id
     res = await LLMClientFactory.get_for_project(db_session, project_id=project_id)
     assert res is None
 
 
 @pytest.mark.asyncio
 async def test_factory_returns_none_when_disabled(db_session: AsyncSession):
-    project_id = uuid4()
+    project = Project(name="proj-openai")
+    db_session.add(project)
+    await db_session.flush()
+    project_id = project.id
     provider = LLMProvider(kind=LLMProviderKind.OPENAI, name="openai-test", is_enabled=False)
     db_session.add(provider)
     await db_session.flush()
@@ -34,7 +41,11 @@ async def test_factory_returns_none_when_disabled(db_session: AsyncSession):
 async def test_factory_openai_success(db_session: AsyncSession, monkeypatch):
     # Ensure encryption has a key in tests
     os.environ.setdefault("LLM_SECRET_KEY", "unit-test-secret-key-please-change")
-    project_id = uuid4()
+    from app.db.models import Project
+    project = Project(name="proj-openai-success")
+    db_session.add(project)
+    await db_session.flush()
+    project_id = project.id
     provider = LLMProvider(kind=LLMProviderKind.OPENAI, name="openai-live", is_enabled=True)
     db_session.add(provider)
     await db_session.flush()

@@ -1,16 +1,17 @@
 """API key management endpoints."""
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app import crud
 from app.db.session import get_db
 from app.schemas.apikey import ApiKeyCreate, ApiKeyOut
 from app.security.auth import require_project_scope, sha256_key, get_current_principal
-from app.db.models import ProjectRole, AuditEvent
+from app.db.models import ProjectRole, AuditEvent, ApiKey as ApiKeyModel
 
 router = APIRouter()
 
@@ -20,12 +21,32 @@ async def list_api_keys(
     *,
     db: AsyncSession = Depends(get_db),
     project_id: UUID,
+    skip: int = 0,
+    limit: int = 50,
+    q: Optional[str] = None,
     principal = Depends(get_current_principal),
 ):
-    # Require OWNER to list keys
+    """List API keys for a project with optional pagination and name search.
+
+    - Authorization: OWNER only
+    - Query params:
+      - skip: offset for pagination
+      - limit: max rows (capped to 200)
+      - q: case-insensitive substring on `name`
+    """
     await require_project_scope(str(project_id), required_roles=[ProjectRole.OWNER], principal=principal, db=db)
-    keys = await crud.api_key.get_by_project(db, project_id=project_id)
-    # Do not expose hashed_key or plaintext
+    limit_capped = max(1, min(limit, 200))
+    stmt = select(ApiKeyModel).where(ApiKeyModel.project_id == project_id)
+    if q:
+        # Use ILIKE for case-insensitive match when supported; fallback behavior acceptable
+        try:
+            from sqlalchemy import func
+            stmt = stmt.where(ApiKeyModel.name.ilike(f"%{q}%"))  # type: ignore[attr-defined]
+        except Exception:
+            stmt = stmt.where(func.lower(ApiKeyModel.name).contains(q.lower()))  # type: ignore
+    stmt = stmt.order_by(ApiKeyModel.created_at.desc()).offset(skip).limit(limit_capped)
+    res = await db.execute(stmt)
+    keys = list(res.scalars().all())
     return [ApiKeyOut.model_validate(k) for k in keys]
 
 
@@ -84,3 +105,24 @@ async def revoke_api_key(
     await db.commit()
 
     return key
+
+
+@router.get("/scopes", response_model=List[str])
+async def list_api_key_scopes(
+    *,
+    db: AsyncSession = Depends(get_db),
+    project_id: UUID,
+    principal = Depends(get_current_principal),
+):
+    """Enumerate available API key scopes for clients to present.
+
+    Owner-only endpoint for now to keep shape simple.
+    Mirrors documented scopes in SECURITY.md.
+    """
+    await require_project_scope(str(project_id), required_roles=[ProjectRole.OWNER], principal=principal, db=db)
+    return [
+        "read:project",
+        "write:project",
+        "run:request",
+        "read:artifacts",
+    ]

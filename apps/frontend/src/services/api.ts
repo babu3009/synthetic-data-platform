@@ -33,10 +33,9 @@ api.interceptors.response.use(
       // Handle unauthorized access - clear both token variants
       localStorage.removeItem('access_token')
       localStorage.removeItem('authToken')
-      // Avoid infinite loops if already on login
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      localStorage.removeItem('user_role')
+      // Dispatch custom event to notify auth context
+      window.dispatchEvent(new CustomEvent('auth:logout'))
     }
     return Promise.reject(error)
   }

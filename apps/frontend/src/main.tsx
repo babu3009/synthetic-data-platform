@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import HomePage from './pages/home_page'
 import LoginPage from './pages/auth/login_page'
+import OidcCallbackPage from './pages/auth/oidc_callback_page'
 import RegisterPage from './pages/auth/register_page'
 import VerifyEmailPage from './pages/auth/verify_email_page'
 import ForgotPasswordPage from './pages/auth/forgot_password_page'
@@ -17,10 +18,18 @@ import LlmProvidersPage from './pages/admin/llm_providers_page'
 import ProjectsListPage from './pages/projects/projects_list_page'
 import ProjectCreatePage from './pages/projects/project_create_page'
 import ProjectDetailPage from './pages/projects/project_detail_page'
+import SourcesListPage from './pages/projects/sources_list_page'
+import SourceSchemaPage from './pages/projects/source_schema_page'
+import SourceDagPage from './pages/projects/source_dag_page'
+import ProjectApiKeysPage from './pages/projects/project_api_keys_page'
+import RequestsListPage from './pages/projects/requests_list_page'
+import ValidationRulesPage from './pages/projects/validation_rules_page'
+import FlatPreviewPage from './pages/flat_preview_page'
 import AdminUsersPage from './pages/admin/admin_users_page'
 import AppNavbar from './components/app_navbar'
 import RequireAuth from './components/require_auth'
 import 'bootstrap/dist/css/bootstrap.min.css'
+import 'bootstrap-icons/font/bootstrap-icons.css'
 import { AuthProvider } from './state/auth_context'
 import './index.css'
 import { ToastProvider } from './state/toast_context'
@@ -52,6 +61,7 @@ if (rootEl) {
                 <main className="container-fluid px-0">
                   <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/oidc/callback" element={<OidcCallbackPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -62,6 +72,13 @@ if (rootEl) {
                 <Route path="/projects" element={<RequireAuth><ProjectsListPage /></RequireAuth>} />
                 <Route path="/projects/new" element={<RequireAuth><ProjectCreatePage /></RequireAuth>} />
                 <Route path="/projects/:id" element={<RequireAuth><ProjectDetailPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/sources" element={<RequireAuth><SourcesListPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/api-keys" element={<RequireAuth><ProjectApiKeysPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/requests" element={<RequireAuth><RequestsListPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/validation" element={<RequireAuth><ValidationRulesPage /></RequireAuth>} />
+                <Route path="/flat/preview" element={<RequireAuth><FlatPreviewPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/sources/:sourceId/schema" element={<RequireAuth><SourceSchemaPage /></RequireAuth>} />
+                <Route path="/projects/:projectId/sources/:sourceId/dag" element={<RequireAuth><SourceDagPage /></RequireAuth>} />
                 <Route path="/wizard" element={<RequireAuth><WizardPage /></RequireAuth>} />
                 <Route path="/projects/:projectId/wizard" element={<RequireAuth><WizardPage /></RequireAuth>} />
                 <Route path="/projects/:projectId/requests/:requestId" element={<RequireAuth><RequestDetailPage /></RequireAuth>} />

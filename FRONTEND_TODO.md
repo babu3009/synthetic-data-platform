@@ -1,6 +1,6 @@
 # Frontend TODO (API Coverage Gap Analysis)
 
-Generated: 2025-11-10
+Generated: 2025-11-13
 
 ## Legend
 - [ ] Not started
@@ -21,38 +21,39 @@ Generated: 2025-11-10
 - DELETE /api/v1/projects/{id} — [x] Delete with confirm + toast.
 
 ### API Keys (Project-scoped)
-- GET /api/v1/projects/{project_id}/api-keys — [ ] Missing UI.
-- POST /api/v1/projects/{project_id}/api-keys — [ ] Missing creation flow.
-- DELETE /api/v1/projects/{project_id}/api-keys/{key_id} — [ ] Missing revoke button.
+- GET /api/v1/projects/{project_id}/api-keys — [x] List page implemented (OWNER-only; masked output without plaintext).
+- POST /api/v1/projects/{project_id}/api-keys — [x] Creation modal implemented; shows plaintext once via ephemeral alert.
+- DELETE /api/v1/projects/{project_id}/api-keys/{key_id} — [x] Revoke action with confirm & toast.
 
 ### Sources
-Implemented subset (upload + schema/table fetch).
-- POST /api/v1/projects/{project_id}/sources — [~] Upload implemented (DDL & JSON). Need dialect selection UI polish & error states.
-- GET /api/v1/projects/{project_id}/sources/{source_id} — [x] Fallback to /tables implemented.
-- GET /api/v1/projects/{project_id}/sources/{source_id}/dag — [ ] No DAG visualization yet (backend endpoint exists).
-- GET /api/v1/projects/{project_id}/sources/{source_id}/tables — [x] Used as fallback.
+Implemented subset (upload + schema/table fetch) and new enhancements.
+- POST /api/v1/projects/{project_id}/sources — [x] Upload implemented (DDL & JSON). Dialect selection added; error states displayed.
+- GET /api/v1/projects/{project_id}/sources — [x] Sources list page implemented (backend list endpoint live; shows kind, created_at, tables_count). Pagination TBD.
+- GET /api/v1/projects/{project_id}/sources/{source_id} — [x] Schema view implemented (falls back to /tables when needed).
+- GET /api/v1/projects/{project_id}/sources/{source_id}/dag — [x] DAG visualization implemented (ReactFlow with auto layout).
+- GET /api/v1/projects/{project_id}/sources/{source_id}/tables — [x] Used as fallback for schema.
 
 ### Requests (Synthetic Generation)
 - POST /api/v1/projects/{project_id}/requests — [x] createRequest used in wizard run step.
-- GET /api/v1/projects/{project_id}/requests — [ ] Missing list/history view.
+- GET /api/v1/projects/{project_id}/requests — [x] Requests list/history page implemented with status badges, search, pagination.
 - GET /api/v1/projects/{project_id}/requests/{request_id} — [x] request detail page present.
 - POST /api/v1/projects/{project_id}/requests/{request_id}:estimate — [x] estimateRequest used.
 - POST /api/v1/requests/{request_id}:start — [x] startRequest invoked.
 
 ### Artifacts
 - GET /api/v1/requests/{request_id}/artifacts — [x] listArtifacts used.
-- GET /api/v1/requests/{request_id}/artifacts/{artifact_id} — [ ] No individual artifact detail/download UI (only list & signed URL logic missing).
-- GET /api/v1/requests/{request_id}/artifacts/{artifact_id}:sign (compat via colon) — [ ] Not integrated (no signed URL button).
+- GET /api/v1/requests/{request_id}/artifacts/{artifact_id} — [x] Artifact download via "Get Signed URL" action on request detail page.
+- GET /api/v1/requests/{request_id}/artifacts/{artifact_id}:sign (compat via colon) — [x] Integrated; opens signed URL in a new tab with fallback to storage_uri.
 
 ### Flat Preview & Jobs
-- POST /api/v1/flat/preview — [ ] Not wired to a UI preview pane.
+- POST /api/v1/flat/preview — [x] UI preview pane wired (`FlatPreviewPage` with JSON editor and rows table).
 
 ### Validate Rules
-- POST /api/v1/validate — [~] Service exists (`validation.ts`); UI lacks report rendering & rule builder.
+- POST /api/v1/validate — [x] Rule builder UI and report rendering implemented (sample vs final toggle via "Sample Only").
 
 ### Provider Inference
 - POST /api/v1/projects/{project_id}/infer/providers — [x] Used (`providers.ts` inferProviders).
-- POST /api/v1/infer/providers — [ ] Non-scoped alias unused (optional).
+- POST /api/v1/infer/providers — [x] Non-scoped alias wired (used as fallback when projectId is absent).
 
 ### LLM Settings (Project)
 - GET /api/v1/projects/{project_id}/llm-settings — [x]
@@ -67,12 +68,12 @@ Implemented subset (upload + schema/table fetch).
 - POST /api/v1/admin/llm/providers/{provider_id}/models — [x]
 - POST /api/v1/admin/llm/providers/{provider_id}:probe — [x]
 - POST /api/v1/admin/llm/providers/{provider_id}:discover-models — [x]
-- Default model marking UX — [ ] Follow-up (client helper exists but needs UI trigger).
+- Default model marking UX — [x] Implemented: "Discover Models" drawer lists models with a "Make Default" action; default badge shown and lists refresh after discover/mark.
 
 ### Auth & Users
-// OIDC still pending; all password-based flows now implemented
-- GET /api/v1/auth/login (OIDC start) — [ ] Not used; only password login implemented.
-- GET /api/v1/auth/callback — [ ] No OIDC callback page.
+// OIDC implemented (SSO button on login and callback page storing dev token); password-based flows also implemented
+- GET /api/v1/auth/login (OIDC start) — [x] Used by SSO button on `login_page`.
+- GET /api/v1/auth/callback — [x] OIDC callback page stores dev token; redirects with success toast.
 - POST /api/v1/auth/register — [x] Registration page implemented (navigates to verify screen).
 - POST /api/v1/auth/verify-email — [x] Verification page with OTP + resend + toasts.
 - POST /api/v1/auth/login — [x] Login (success toast, email prefill support, role capture).
@@ -97,9 +98,9 @@ Ordered by impact & dependency.
    - [x] Create project form (name, owner, optional run-status webhook URL) w/ optimistic cache update.
    - [x] Detail & edit (rename, run-status webhook field, delete confirm + toasts, optimistic update, owner change confirmation, webhook register button).
 2. API Keys Management
-   - [ ] List keys (masked) with scopes.
-   - [ ] Create key modal (name + scopes multi-select) displaying plaintext once.
-   - [ ] Revoke key action (confirmation dialog).
+   - [x] List keys (masked) with scopes.
+   - [x] Create key modal (name + scopes multi-select) displaying plaintext once.
+   - [x] Revoke key action (confirmation dialog).
 3. Auth Flows Expansion
    - [x] Registration page (email, org, password; success leads to verify screen).
    - [x] Email verification screen (OTP input + resend). 
@@ -109,31 +110,62 @@ Ordered by impact & dependency.
 4. Admin User Approval
    - [x] Admin dashboard showing pending users with approve/reject actions.
 5. Sources Enhancements
-   - [ ] DAG visualization using /dag endpoint (ReactFlow integration).
-   - [ ] Source list/history per project (show uploaded files, timestamps).
-6. Requests & Artifacts
-   - [ ] Requests list/history page (status badges, last run times).
-   - [ ] Artifact detail/download (signed URL fetch; add "Get Signed URL" button).
-   - [ ] Signed URL integration for CSV/Parquet/XLSX/JSONL.
+   - [x] DAG visualization using /dag endpoint (ReactFlow integration).
+   - [x] Source list/history per project (shows uploaded files, timestamps, tables_count). Pagination & filtering TBD.
+6.  Requests& Artifacts
+   - [x] Requests list/history page (status badges, last run times).
+   - [x] Artifact detail/download (signed URL fetch; add "Get Signed URL" button).
+   - [x] Signed URL integration for CSV/Parquet/XLSX/JSONL.
 7. Validation Rules UI
-   - [ ] Rule builder form for uniqueness, implication, distribution, temporal.
-   - [ ] Preview validation report rendering (sample vs final).
+   - [x] Rule builder form for uniqueness, implication, distribution, temporal.
+   - [x] Preview validation report rendering (sample vs final).
 8. Flat Preview
-   - [ ] UI pane for POST /flat/preview (schema JSON editor + first 100 rows table).
+   - [x] UI pane for POST /flat/preview (schema JSON editor + first 100 rows table).
 9. Provider Suggestions UX
-   - [ ] Improve provider suggestions display (confidence, manual override diff highlighting).
+   - [x] Improve provider suggestions display (confidence, manual override diff highlighting).
+   - [x] Per-row "Apply suggestion" action with confidence badge.
+   - [x] Inline "Why this suggestion?" popover next to suggested provider.
+   - [x] Compact summary banner after suggest run (X provider changes, Y PII updates).
+   - [x] Per-row "Overwrites manual" hint when suggestion replaces existing provider/config.
    - [ ] Persist provider configs fully (backend PUT providers endpoint forthcoming) — adjust once API stable.
 10. LLM Model Default UX
-   - [ ] Add toggle/button to mark one model default; refresh list after discover.
+   - [x] Mark default model via Discover and inline models list; default badge and Default Model column.
+   - Enhancements backlog:
+      1. [x] Default toggle inline (radio-style)
+    2. [x] Confirm default changes (optional dialog)
+      3. [x] Success/error toasts on mark default
+     4. [x] Show default in providers list (Default Model column)
+      5. [x] Refresh models in-place (per-provider)
+     6. [x] “No models” CTA (with Discover action and credentials hint)
+     7. [x] Filters and sort in models table (chat/json/context)
+   8. [x] Model metadata popover (context, json, provider-specific)
+   9. [x] Inline edit of display name
+       10. [x] Newly discovered/updated badge after discover
+     11. [ ] Default-by-task type (chat/embeddings/tools) if supported
+       12. [x] Project LLM Settings: “Use provider default” shortcut
+     13. [x] RBAC cues (hide/disable actions for non-OWNER with tooltip)
+       14. [x] Rate-limit/network error UX with backoff
+     15. [x] Optimistic default switch with revert on failure
+     16. [x] Persist Show Models expansion state per provider
+       17. [x] Keyboard and a11y improvements (aria-live, focus)
+        - [x] Added aria-live status updates for default change and loading
+       18. [~] Audit and metrics surface (recent default changes) — lightweight "Last change" text added
+   19. [x] Backend PATCH endpoint to set default explicitly
+   20. [x] Default uniqueness enforcement (DB/server guard)
+   21. [x] Denormalized default on provider (default_model_id)
+      22. [x] Test coverage additions (inline + drawer parity)
+   23. [x] Skeleton/loading polish for models and default cell (aria-busy + placeholder during loading/marking)
+     24. [x] Discover progress feedback (long operations)
+       25. [x] Documentation: Default model workflow
 11. OIDC (Optional Phase)
-   - [ ] OIDC login start redirect & callback handler storing token.
+   - [x] OIDC login start redirect & callback handler storing token.
 12. Webhook Configuration
    - [x] Run-status webhook URL field + Register Webhook button invoking POST /webhooks/run-status.
 
 ## Cross-Cutting Improvements
 - [x] Central error boundary + global toast system.
-- [~] Loading skeletons (Profile & Verify Email done; requests list & providers discovery pending).
-- [ ] Rate-limit feedback banner for infer providers (handle 429 gracefully).
+- [x] Loading skeletons (Profile & Verify Email, requests list, and providers discovery done; default cell polish tracked under LLM item 23).
+- [x] Rate-limit feedback banner for infer providers (handle 429 gracefully).
 - [x] Access control UI (hide OWNER-only LLM Providers link; extend later for ADMIN).
 
 ## Acceptance Criteria Examples
@@ -157,8 +189,8 @@ Assign owners once team roles are confirmed:
 | Admin User Approval | Ops/Admin |
 
 ## Deferred / Optional
-- [ ] Non-scoped infer alias usage (/infer/providers) — only if public trial mode needed.
-- [ ] Advanced artifacts filtering (format/date range).
+- [x] Non-scoped infer alias usage (/infer/providers) — wired as fallback when projectId missing.
+- [x] Advanced artifacts filtering (format/date range) — client-side filters on Request Detail page.
 - [ ] Real-time job progress via WebSocket instead of polling.
 
 ## Done / Implemented Snapshot

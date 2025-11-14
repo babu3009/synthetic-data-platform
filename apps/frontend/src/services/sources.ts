@@ -42,3 +42,30 @@ export async function getSourceSchema(projectId: string, sourceId: string, heade
   const res2 = await api.get(`/api/v1/projects/${projectId}/sources/${sourceId}/tables`, { headers })
   return res2.data
 }
+
+// List sources for a project. Backend currently omits explicit list endpoint in legacy router; if unavailable this will
+// return an empty array. Once /api/v1/projects/:projectId/sources is implemented to list existing sources, this method
+// will surface real data.
+export type SourceListItem = {
+  id: string
+  kind: string
+  created_at?: string
+  tables_count?: number
+}
+
+export async function listSources(projectId: string): Promise<SourceListItem[]> {
+  try {
+    const res = await api.get(`/api/v1/projects/${projectId}/sources`)
+    // Expect shape: [{ id, kind, created_at, tables_count? }]
+    if (Array.isArray(res.data)) return res.data as SourceListItem[]
+    return []
+  } catch (e) {
+    // Gracefully degrade until endpoint exists
+    return []
+  }
+}
+
+export async function getSourceDag(projectId: string, sourceId: string) {
+  const res = await api.get(`/api/v1/projects/${projectId}/sources/${sourceId}/dag`)
+  return res.data as { nodes: string[]; edges: [string, string][] }
+}

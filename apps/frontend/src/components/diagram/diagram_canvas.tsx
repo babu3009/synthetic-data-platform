@@ -84,10 +84,13 @@ export default function DiagramCanvas(_: DiagramProps) {
 
   // Synchronize when entity changes
   const lastEntityId = useRef<string | undefined>(undefined)
-  if (entityId && lastEntityId.current !== entityId) {
+  const lastEntityUpdate = useRef<string | undefined>(undefined)
+  
+  if (entityId && (lastEntityId.current !== entityId || lastEntityUpdate.current !== entity?.updatedAt)) {
     setNodes(nodesInit)
     setEdges(edgesInit)
     lastEntityId.current = entityId
+    lastEntityUpdate.current = entity?.updatedAt
   }
 
   const onConnect: OnConnect = useCallback(

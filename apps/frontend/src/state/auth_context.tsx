@@ -14,6 +14,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<string | null>(() => localStorage.getItem('user_role'))
   const [loading, setLoading] = useState(false)
 
+  // Listen for auth:logout event from axios interceptor
+  React.useEffect(() => {
+    const handleAuthLogout = () => {
+      setToken(null)
+      setRole(null)
+      navigate('/login', { replace: true })
+    }
+
+    window.addEventListener('auth:logout', handleAuthLogout)
+    return () => window.removeEventListener('auth:logout', handleAuthLogout)
+  }, [navigate])
+
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true)
     try {

@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import schemas
 from app.db import models
 from app.db.session import get_db
-from app.modules.synth.service import upload_source as service_upload_source, get_source_schema as service_get_source_schema, get_source_dag as service_get_source_dag, get_source_tables as service_get_source_tables
+from app.modules.synth.service import (
+    upload_source as service_upload_source,
+    get_source_schema as service_get_source_schema,
+    get_source_dag as service_get_source_dag,
+    get_source_tables as service_get_source_tables,
+    list_sources as service_list_sources,
+)
 
 router = APIRouter()
 
@@ -56,6 +62,17 @@ async def upload_source(
     return await service_upload_source(db, project_id=project_id, file=file, dialect=dialect)
 
 
+@router.get("/", response_model=list[schemas.Source])
+async def list_project_sources(
+    *,
+    db: AsyncSession = Depends(get_db),
+    project_id: UUID,
+    skip: int = 0,
+    limit: int = 100,
+):
+    return await service_list_sources(db, project_id=project_id, skip=skip, limit=limit)
+
+
 @router.get("/{source_id}", response_model=schemas.SchemaResponse)
 async def get_source_schema(
     *,
@@ -80,4 +97,5 @@ async def get_source_tables(
     db: AsyncSession = Depends(get_db),
     source_id: UUID,
 ) -> list[schemas.TableSchema]:
-    return await service_get_source_tables(db, source_id=source_id)
+    result = await service_get_source_tables(db, source_id=source_id)
+    return list(result)

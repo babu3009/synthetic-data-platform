@@ -26,7 +26,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.db.models import ApiKey, ProjectMember, ProjectRole
+from app.db.models import ApiKey, ProjectMember, ProjectRole, User
 import httpx
 
 
@@ -40,6 +40,7 @@ class Principal:
     project_id: Optional[str] = None
     scopes: list[str] = None
     user_sub: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 # --- OIDC scaffolding ---
@@ -137,7 +138,8 @@ async def get_current_principal(
     Priority:
     1) X-API-Key header -> ApiKey principal
     2) Dev/testing user via X-User-Sub or Authorization: Bearer testing:<sub>
-    3) (Future) OIDC ID token in Authorization: Bearer <jwt>
+    3) JWT Bearer token -> User principal (validates token signature and expiry)
+    4) (Future) OIDC ID token in Authorization: Bearer <jwt>
     """
     # API Key auth
     if x_api_key:
@@ -152,12 +154,70 @@ async def get_current_principal(
 
     # Test/dev user injection
     if x_user_sub:
-        return Principal(kind="user", actor=f"user:{x_user_sub}", user_sub=x_user_sub)
+        # Try to resolve to a concrete user id by email (common dev case)
+        principal = Principal(kind="user", actor=f"user:{x_user_sub}", user_sub=x_user_sub)
+        try:
+            res = await db.execute(select(User).where(User.email == x_user_sub))
+            u = res.scalar_one_or_none()
+            if not u and "@" not in x_user_sub:
+                # Fallback to local-suffix convention used in tests/dev
+                res = await db.execute(select(User).where(User.email == (x_user_sub + "@local")))
+                u = res.scalar_one_or_none()
+            if u:
+                principal.user_id = str(u.id)
+        except Exception:
+            pass
+        return principal
     if authorization and authorization.startswith("Bearer testing:"):
         sub = authorization.split(" ", 1)[1].split(":", 1)[1]
-        return Principal(kind="user", actor=f"user:{sub}", user_sub=sub)
+        principal = Principal(kind="user", actor=f"user:{sub}", user_sub=sub)
+        try:
+            res = await db.execute(select(User).where(User.email == sub))
+            u = res.scalar_one_or_none()
+            if not u and "@" not in sub:
+                res = await db.execute(select(User).where(User.email == (sub + "@local")))
+                u = res.scalar_one_or_none()
+            if u:
+                principal.user_id = str(u.id)
+        except Exception:
+            pass
+        return principal
 
-    # TODO: Implement real OIDC token validation here (jwks, nonce/state, etc.)
+    # JWT Bearer token validation (for real user login tokens)
+    if authorization and authorization.startswith("Bearer ") and not authorization.startswith("Bearer testing:"):
+        token = authorization.split(" ", 1)[1]
+        try:
+            from app.security.jwt import decode_token
+            claims = decode_token(token)
+            user_id = claims.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token claims")
+            # Verify user exists in database
+            try:
+                typed_user_id = _UUID(str(user_id))
+            except Exception:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token")
+            
+            user_res = await db.execute(select(User).where(User.id == typed_user_id))
+            user = user_res.scalar_one_or_none()
+            if not user:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+            
+            # Build principal with user info
+            principal = Principal(
+                kind="user",
+                actor=f"user:{user_id}",
+                user_id=str(user_id),
+                user_sub=str(user.email)  # Use email as user_sub for compatibility
+            )
+            return principal
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Token decode failure (expired, invalid signature, etc.)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+
+    # No valid auth method found
     return None
 
 
@@ -209,12 +269,23 @@ async def require_project_scope(
                 try:
                     typed_project_id = _UUID(str(project_id))
                 except Exception:
-                    # Leave as-is if it can't be parsed; useful if schema uses string IDs
                     typed_project_id = project_id
+
+            # Prefer user_id match when available; fall back to user_sub for legacy records
+            if principal.user_id:
+                try:
+                    typed_user_id = _UUID(str(principal.user_id))
+                except Exception:
+                    typed_user_id = None
+            else:
+                typed_user_id = None
+
+            if typed_user_id is None:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User identity not resolved")
             res = await db.execute(
                 select(ProjectMember).where(
                     ProjectMember.project_id == typed_project_id,
-                    ProjectMember.user_sub == principal.user_sub,
+                    ProjectMember.user_id == typed_user_id,
                 )
             )
             member = res.scalar_one_or_none()

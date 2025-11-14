@@ -53,7 +53,13 @@ export default function LlmSettingsPage() {
   })
 
   const modelsQ = useLlmModels(projectId, providerId || '')
-  const inferMut = useInferProviders(projectId)
+  const effectiveModelId = React.useMemo(() => {
+    return modelId || modelsQ.data?.find((m) => m.is_default)?.id
+  }, [modelId, modelsQ.data])
+  const inferMut = useInferProviders(projectId, {
+    taskType: 'chat',
+    taskDefaults: effectiveModelId ? { chat: effectiveModelId } : undefined,
+  })
 
   // Primitive snapshots to drive initialization without depending on object identity
   const depProviderId = settingsQ.data?.provider_id || undefined
@@ -168,6 +174,22 @@ export default function LlmSettingsPage() {
                       <option value={m.id} key={m.id}>{m.display_name || m.name}{m.is_default ? ' (default)' : ''}</option>
                     ))}
                   </Form.Select>
+                  <div className="mt-2">
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      disabled={!canEdit || !providerId || modelsQ.isLoading || !modelsQ.data?.some((m) => m.is_default)}
+                      onClick={() => {
+                        const def = modelsQ.data?.find((m) => m.is_default)
+                        if (!def || !settingsQ.data) return
+                        setModelId(def.id)
+                        // Save immediately to apply shortcut
+                        saveMut.mutate({ ...settingsQ.data, provider_id: providerId || null, model_id: def.id })
+                      }}
+                    >
+                      Use provider default
+                    </Button>
+                  </div>
                 </Col>
               </Row>
               <Button
