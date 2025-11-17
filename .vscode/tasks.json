@@ -1,0 +1,141 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "frontend: dev",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"dev"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/frontend"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "backend: migrate",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-Command",
+				"alembic upgrade head"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "backend: test (pytest)",
+			"type": "shell",
+			"command": "C:/pyenv/.conda/envs/conda-synthetic-data/python.exe",
+			"args": [
+				"-m",
+				"pytest",
+				"-q",
+				"tests"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"isBackground": false,
+			"problemMatcher": [
+				"$python"
+			],
+			"group": "test"
+		},
+		{
+			"label": "backend: test (conda)",
+			"type": "shell",
+			"command": "C:/pyenv/.conda/envs/conda-synthetic-data/python.exe",
+			"args": [
+				"-m",
+				"pytest",
+				"-q",
+				"-m",
+				"not e2e",
+				"tests"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"isBackground": false,
+			"problemMatcher": [
+				"$python"
+			],
+			"group": "test"
+		},
+		{
+			"label": "backend: test (coverage)",
+			"type": "shell",
+			"command": "C:/pyenv/.conda/envs/conda-synthetic-data/python.exe",
+			"args": [
+				"-m",
+				"pytest",
+				"--cov=app",
+				"--cov-report=term-missing",
+				"--cov-fail-under=80",
+				"-m",
+				"not e2e",
+				"tests"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"isBackground": false,
+			"problemMatcher": [
+				"$python"
+			],
+			"group": "test"
+		},
+		{
+			"label": "backend: dev (no reload)",
+			"type": "shell",
+			"command": "C:/pyenv/.conda/envs/conda-synthetic-data/python.exe",
+			"args": [
+				"-m",
+				"uvicorn",
+				"app.main:app",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"8000"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "backend: dev (hot reload)",
+			"type": "shell",
+			"command": "C:/pyenv/.conda/envs/conda-synthetic-data/python.exe",
+			"args": [
+				"run_dev.py"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/backend"
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "temp: pytest summary",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-Command",
+				"Push-Location \"${workspaceFolder}/apps/backend\"; $env:PYTHONPATH='.'; C:/pyenv/.conda/envs/conda-synthetic-data/python.exe -m pytest -q; Pop-Location"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}

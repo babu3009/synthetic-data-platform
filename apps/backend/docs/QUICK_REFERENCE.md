@@ -88,12 +88,12 @@ pip install --force-reinstall <package-name>
 
 # Check Python path
 python -c "import sys; print(sys.executable)"
-# Should show: C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe
+# Should show: C:\pyenv\.conda\envs\conda-synthetic-data\python.exe
 ```
 
 ### Environment Details
 - **Python**: 3.11.14
-- **Location**: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\`
+- **Location**: `C:\pyenv\.conda\envs\conda-synthetic-data\`
 - **Conda**: `C:\ProgramData\miniforge3\`
 - **Packages**: 34 installed
 

@@ -1,0 +1,27 @@
+{
+  "python.defaultInterpreterPath": "C:\\pyenv\\.conda\\envs\\conda-synthetic-data\\python.exe",
+  "python.condaPath": "C:\\ProgramData\\miniforge3\\Scripts\\conda.exe",
+  "terminal.integrated.profiles.windows": {
+    "Miniforge CMD": {
+      "path": "%windir%\\System32\\cmd.exe",
+      "args": [
+        "/K",
+        "C:\\ProgramData\\miniforge3\\Scripts\\activate.bat C:\\ProgramData\\miniforge3 && conda activate conda-synthetic-data"
+      ]
+    },
+    "Miniforge PowerShell": {
+      "path": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-Command",
+        "(C:\\ProgramData\\miniforge3\\shell\\condabin\\conda-hook.ps1) ; (conda activate C:\\pyenv\\.conda\\envs\\conda-synthetic-data)"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "Miniforge CMD",
+  "python.terminal.activateEnvironment": true,
+  "python-envs.defaultEnvManager": "ms-python.python:conda",
+  "python-envs.defaultPackageManager": "ms-python.python:conda",
+  "python-envs.pythonProjects": []
+}

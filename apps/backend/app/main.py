@@ -1,15 +1,25 @@
 import asyncio
+import logging
+import traceback
 from typing import Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
+from app.core.logging import configure_logging
 from app.api.api_v1.api import api_router
 from app.jobs.cleanup import cleanup_expired_artifacts
 from app.observability import init_observability
+
+# Configure logging at module level
+configure_logging(level=settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
+logger = logging.getLogger(__name__)
 
 _cleanup_task: Optional[asyncio.Task] = None
 
@@ -66,6 +76,80 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+# Exception handlers for comprehensive error logging
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions and log errors (4xx as warning, 5xx as error)."""
+    log_level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+    
+    logger.log(
+        log_level,
+        f"HTTP {exc.status_code} | {request.method} {request.url.path} | {exc.detail}",
+        extra={
+            "method": request.method,
+            "url": str(request.url),
+            "status_code": exc.status_code,
+            "detail": exc.detail,
+            "client": request.client.host if request.client else None,
+        }
+    )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle request validation errors and log them."""
+    logger.warning(
+        f"Validation Error | {request.method} {request.url.path} | {exc.errors()}",
+        extra={
+            "method": request.method,
+            "url": str(request.url),
+            "errors": exc.errors(),
+            "body": exc.body,
+            "client": request.client.host if request.client else None,
+        }
+    )
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler for unhandled exceptions with full traceback logging."""
+    tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    
+    logger.error(
+        f"UNHANDLED EXCEPTION | {request.method} {request.url.path} | {type(exc).__name__}: {str(exc)}\n{tb_str}",
+        extra={
+            "method": request.method,
+            "url": str(request.url),
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "traceback": tb_str,
+            "client": request.client.host if request.client else None,
+        },
+        exc_info=True
+    )
+    
+    # Don't expose internal error details to client in production
+    detail = "Internal server error"
+    if settings.DEBUG if hasattr(settings, "DEBUG") else False:
+        detail = f"{type(exc).__name__}: {str(exc)}"
+    
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": detail},
+    )
+
+
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -112,5 +196,9 @@ async def _run_cleanup_periodically(interval_minutes: int) -> None:
 
 if __name__ == "__main__":
     import uvicorn
+    import multiprocessing
+
+    # Fix for Windows multiprocessing issues with uvicorn reload
+    multiprocessing.freeze_support()
 
     uvicorn.run(app, host="0.0.0.0", port=8000)

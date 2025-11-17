@@ -12,9 +12,17 @@ export const ToastContext = React.createContext<ToastContextValue | undefined>(u
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = React.useState<ToastItem[]>([])
+  
   const push = React.useCallback((kind: ToastItem['kind'], message: string) => {
-    setToasts(t => [...t, { id: crypto.randomUUID(), kind, message, ts: Date.now() }])
+    const id = crypto.randomUUID()
+    setToasts(t => [...t, { id, kind, message, ts: Date.now() }])
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      setToasts(t => t.filter(x => x.id !== id))
+    }, 5000)
   }, [])
+  
   const dismiss = React.useCallback((id: string) => {
     setToasts(t => t.filter(x => x.id !== id))
   }, [])

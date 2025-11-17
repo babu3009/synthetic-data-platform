@@ -9,7 +9,7 @@ Successfully created and configured a Conda environment using miniforge3 for the
 ### 1. Conda Environment
 - **Name**: `conda-synthetic-data`
 - **Type**: Conda environment (miniforge3)
-- **Location**: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\`
+- **Location**: `C:\pyenv\.conda\envs\conda-synthetic-data\`
 - **Conda Path**: `C:\ProgramData\miniforge3\`
 - **Python Version**: 3.11.14
 - **Status**: ✅ Created and packages installed
@@ -149,7 +149,7 @@ synthetic-data-platform/
     └── ENVIRONMENT.md             # ✅ UPDATED - Conda environment docs
 
 Conda Environment Location:
-C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\
+C:\pyenv\.conda\envs\conda-synthetic-data\
 ├── python.exe
 ├── Scripts/                       # Installed executables
 │   ├── alembic.exe
@@ -225,7 +225,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 1. Open Command Palette: `Ctrl+Shift+P`
 2. Type: `Python: Select Interpreter`
 3. Choose: `Python 3.11.14 ('conda-synthetic-data')`
-4. Or manually select: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe`
+4. Or manually select: `C:\pyenv\.conda\envs\conda-synthetic-data\python.exe`
 5. **Important**: Reload VS Code window after selection
 
 ### Import Errors After Installation

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # Legacy endpoints still imported for health/projects/api_keys/webhooks until modularized
-from app.api.api_v1.endpoints import health, projects, api_keys, webhooks
+from app.api.api_v1.endpoints import health, projects, api_keys, webhooks, entities
 
 # Module routers (Phase 1 migration)
 from app.modules.auth.api import router as auth_router
@@ -17,6 +17,7 @@ api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
 api_router.include_router(api_keys.router, prefix="/projects/{project_id}/api-keys", tags=["api-keys"])
+api_router.include_router(entities.router, prefix="/projects/{project_id}/entities", tags=["entities"])
 api_router.include_router(webhooks.router, tags=["webhooks"])  # /api/v1/webhooks/run-status
 
 # Modular routers preserving existing prefixes & tags

@@ -1,0 +1,9 @@
+{
+  "id": "aaaaaaaa-bbbb-cccc-dddd-111111111111",
+  "name": "curl-test",
+  "schema": {
+    "tables": [],
+    "relationships": [],
+    "layout": {}
+  }
+}

@@ -7,10 +7,14 @@ export const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    // Disable all caching at HTTP level
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
 })
 
-// Request interceptor for adding auth token
+// Request interceptor for adding auth token and cache-busting
 api.interceptors.request.use(
   (config) => {
     // Support both legacy 'access_token' and new 'authToken'
@@ -18,6 +22,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    
+    // Add timestamp to URL params for cache busting (for GET requests)
+    if (config.method === 'get' || config.method === 'GET') {
+      config.params = {
+        ...config.params,
+        _t: Date.now(), // Cache buster
+      }
+    }
+    
     return config
   },
   (error) => {

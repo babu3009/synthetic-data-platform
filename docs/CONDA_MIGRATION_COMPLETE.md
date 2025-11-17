@@ -9,7 +9,7 @@
 | **Environment Name** | `conda-synthetic-data` |
 | **Type** | Conda (miniforge3) |
 | **Python Version** | 3.11.14 |
-| **Location** | `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\` |
+| **Location** | `C:\pyenv\.conda\envs\conda-synthetic-data\` |
 | **Conda Path** | `C:\ProgramData\miniforge3\` |
 | **Status** | ✅ Active and Configured |
 

@@ -16,7 +16,7 @@ export type Project = {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const res = await api.get('/api/v1/projects')
+  const res = await api.get('/api/v1/projects/')
   return res.data
 }
 
@@ -27,7 +27,7 @@ export async function createProject(input: {
   webhook_run_status_url?: string | null
   artifact_ttl_days?: number | null
 }): Promise<Project> {
-  const res = await api.post('/api/v1/projects', input)
+  const res = await api.post('/api/v1/projects/', input)
   return res.data
 }
 
@@ -69,6 +69,6 @@ export async function checkProjectNameExists(name: string): Promise<boolean> {
 
 // Search project names (for validation/autocomplete)
 export async function searchProjectNames(query: string = ''): Promise<string[]> {
-  const res = await api.get('/api/v1/projects/search', { params: { q: query } })
+  const res = await api.get('/api/v1/projects/search/', { params: { q: query } })
   return res.data
 }

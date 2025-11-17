@@ -7,7 +7,7 @@ Configured the workspace to consistently use the Miniforge `conda-synthetic-data
 
 ## Changes
 - VS Code settings (`.vscode/settings.json`):
-  - `python.defaultInterpreterPath` set to `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe`
+  - `python.defaultInterpreterPath` set to `C:\pyenv\.conda\envs\conda-synthetic-data\python.exe`
   - `python.condaPath` set to `C:\ProgramData\miniforge3\Scripts\conda.exe`
   - Added a "Miniforge CMD" terminal profile to open cmd.exe with:
     - `%windir%\System32\cmd.exe /K C:\ProgramData\miniforge3\Scripts\activate.bat C:\ProgramData\miniforge3 && conda activate conda-synthetic-data`

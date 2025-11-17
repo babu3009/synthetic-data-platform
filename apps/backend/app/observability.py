@@ -88,8 +88,9 @@ def init_observability(app: FastAPI) -> None:
                 FastAPIInstrumentor.instrument_app(app)
             if Psycopg2Instrumentor is not None:
                 Psycopg2Instrumentor().instrument()
-            if RedisInstrumentor is not None:
-                RedisInstrumentor().instrument()
+            # Skip Redis instrumentation - Redis is optional
+            # if RedisInstrumentor is not None:
+            #     RedisInstrumentor().instrument()
             if RequestsInstrumentor is not None:
                 RequestsInstrumentor().instrument()
         except Exception:

@@ -38,7 +38,15 @@ import ErrorBoundary from './components/error_boundary'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 0, // Always treat data as stale - no caching
+      gcTime: 0, // Garbage collect immediately (formerly cacheTime)
+      refetchOnMount: true, // Always refetch on component mount
+      refetchOnWindowFocus: true, // Refetch when window regains focus
+      refetchOnReconnect: true, // Refetch on network reconnect
+      retry: false, // Fail immediately when backend unreachable
+      networkMode: 'always', // Always attempt the request
+    },
+    mutations: {
       retry: 1,
     },
   },

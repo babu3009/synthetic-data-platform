@@ -37,20 +37,62 @@ export async function inferProvidersAlias(entity: EntitySchema, headers?: Record
 export async function saveProviders(
   projectId: string,
   entityId: string,
-  providers: ProviderSuggestion[],
-  headers?: Record<string, string>
+  providers: ProviderSuggestion[]
 ) {
   try {
-    const res = await api.put(`/api/v1/projects/${projectId}/entities/${entityId}/providers`, { providers }, { headers })
-    return res.data
-  } catch (e) {
-    // Fallback to localStorage to avoid data loss
-    try {
-      const key = `providers:${projectId}:${entityId}`
-      localStorage.setItem(key, JSON.stringify(providers))
-    } catch (_) {
-      // ignore
+    // Save to localStorage (primary storage for now)
+    const key = `providers:${projectId}:${entityId}`
+    localStorage.setItem(key, JSON.stringify(providers))
+    
+    // Also save to database via entity update
+    // Build schema from providers
+    const entity = JSON.parse(localStorage.getItem(`autosave:${projectId}:${entityId}`) || '{}')
+    if (entity && entity.tables) {
+      // Apply providers to entity schema
+      const tables = entity.tables.map((table: any) => ({
+        ...table,
+        columns: table.columns.map((col: any) => {
+          const provider = providers.find(p => p.table === table.name && p.column === col.name)
+          if (provider) {
+            return {
+              ...col,
+              provider: provider.provider,
+              providerConfig: provider.providerConfig,
+              pii: provider.pii,
+              piiSubtype: provider.piiSubtype
+            }
+          }
+          return col
+        })
+      }))
+      
+      // Update entity in database
+      const schema = {
+        tables,
+        relationships: entity.relationships,
+        layout: entity.layout
+      }
+      
+      try {
+        await api.put(`/api/v1/projects/${projectId}/entities/${entityId}`, {
+          name: entity.name,
+          schema
+        })
+      } catch (apiError: any) {
+        // If 404, try to create
+        if (apiError?.response?.status === 404 && entity.name) {
+          await api.post(`/api/v1/projects/${projectId}/entities`, {
+            id: entityId,
+            name: entity.name,
+            schema
+          })
+        }
+      }
     }
+    
+    return { success: true, message: 'Providers saved successfully' }
+  } catch (e) {
+    console.error('Failed to save providers:', e)
     throw e
   }
 }

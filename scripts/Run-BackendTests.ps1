@@ -1,7 +1,7 @@
 param(
     [string]$BackendDir = "C:\Code\python\synthetic-data-platform\apps\backend",
     [string[]]$PytestArgs = @("-q", "tests"),
-    [string]$PythonExe = "C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe"
+    [string]$PythonExe = "C:\pyenv\.conda\envs\conda-synthetic-data\python.exe"
 )
 
 Write-Host "Running backend tests via PowerShell script..." -ForegroundColor Cyan

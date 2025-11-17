@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Modal, Button, Form, Tabs, Tab, Alert, Row, Col, Table, Spinner, InputGroup } from 'react-bootstrap'
-import { EntitySchema, Table as EntityTable, isEntityNameUnique, tablesFromCanonicalSchema } from '../../state/wizard'
+import { Modal, Button, Form, Tabs, Tab, Alert, Row, Col, Table, Spinner, InputGroup, Badge } from 'react-bootstrap'
+import { EntitySchema, Table as EntityTable, isEntityNameUnique, tablesFromCanonicalSchema, type Column } from '../../state/wizard'
 import { getSourceSchema, uploadDDLSource, uploadJSONSource } from '../../services/sources'
+import { inferProviders, type ProviderSuggestion } from '../../services/providers'
 
 type Props = {
   show: boolean
@@ -45,6 +46,10 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     pk: ['id'],
   }])
 
+  // Auto-inference tracking
+  const [autoInferenceResult, setAutoInferenceResult] = useState<{ providers: number; pii: number } | null>(null)
+  const [inferring, setInferring] = useState(false)
+
   // Build minimal EntitySchema objects for uniqueness check without any casts
   const nameUnique = useMemo(
     () =>
@@ -54,6 +59,79 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
       ),
     [name, existingNames]
   )
+
+  // Auto-infer providers and PII for given tables with confidence threshold
+  async function autoInferProviders(tablesToInfer: EntityTable[]) {
+    if (!tablesToInfer || tablesToInfer.length === 0) return
+    
+    setInferring(true)
+    setAutoInferenceResult(null)
+    try {
+      // Build minimal entity for inference
+      const tempEntity: EntitySchema = {
+        id: 'temp',
+        name: name || 'temp',
+        tables: tablesToInfer,
+        updatedAt: new Date().toISOString(),
+      }
+      
+      const suggestions = await inferProviders(projectId, tempEntity)
+      
+      // Auto-apply high confidence suggestions (>= 0.7)
+      let providersApplied = 0
+      let piiApplied = 0
+      
+      const updatedTables = tablesToInfer.map(table => {
+        const updatedColumns = table.columns.map(col => {
+          const suggestion = suggestions.find(
+            (s: ProviderSuggestion) => s.table === table.name && s.column === col.name && (s.confidence ?? 0) >= 0.7
+          )
+          
+          if (!suggestion) return col
+          
+          const updates: Partial<Column> = {}
+          let changed = false
+          
+          // Apply provider config if suggested
+          if (suggestion.provider && suggestion.provider !== col.provider) {
+            updates.provider = suggestion.provider
+            updates.providerConfig = suggestion.providerConfig
+            providersApplied++
+            changed = true
+          }
+          
+          // Apply PII flags if suggested
+          if (typeof suggestion.pii === 'boolean' && suggestion.pii !== col.pii) {
+            updates.pii = suggestion.pii
+            updates.piiSubtype = suggestion.piiSubtype
+            piiApplied++
+            changed = true
+          }
+          
+          return changed ? { ...col, ...updates } : col
+        })
+        
+        return { ...table, columns: updatedColumns }
+      })
+      
+      // Update the appropriate state based on current tab
+      if (tab === 'ddl' && ddlTables) {
+        setDdlTables(updatedTables)
+      } else if (tab === 'json' && jsonTables) {
+        setJsonTables(updatedTables)
+      }
+      
+      // Show summary if anything was applied
+      if (providersApplied > 0 || piiApplied > 0) {
+        setAutoInferenceResult({ providers: providersApplied, pii: piiApplied })
+      }
+    } catch (e) {
+      // Silently fail auto-inference - it's a best-effort feature
+      console.warn('Auto-inference failed:', e)
+    } finally {
+      setInferring(false)
+    }
+  }
 
   function resetState() {
     setError(null)
@@ -68,6 +146,8 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     setJsonMode('paste')
     setJsonBuilderTables([{ name: 'table_1', columns: [{ name: 'id', dtype: 'uuid', nullable: false }], pk: ['id'] }])
     setTables([{ name: 'table_1', columns: [{ name: 'id', dtype: 'uuid', nullable: false }], pk: ['id'] }])
+    setAutoInferenceResult(null)
+    setInferring(false)
   }
 
   function closeAndReset() {
@@ -104,9 +184,11 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
         return
       }
       const created = await uploadDDLSource(projectId, file, dialect)
-      const canonical = await getSourceSchema(projectId, created.id)
-      const mapped = tablesFromCanonicalSchema(canonical)
-      setDdlTables(mapped)
+      const canonical = await getSourceSchema(projectId, source.id, 'canonical')
+      const parsed = tablesFromCanonicalSchema(canonical)
+      setDdlTables(parsed)
+      // Auto-infer providers for the parsed tables
+      await autoInferProviders(parsed)
     } catch (e: unknown) {
       setError(extractError(e, 'Failed to parse DDL'))
     } finally {
@@ -246,9 +328,17 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
   }
 
   return (
-  <Modal show={show} onHide={closeAndReset} size="lg" backdrop="static" animation={false}>
+    <Modal show={show} onHide={closeAndReset} size="lg" animation={false}>
       <Modal.Header closeButton>
-        <Modal.Title>Add Entity</Modal.Title>
+        <Modal.Title>
+          Add Entity
+          {inferring && <Spinner animation="border" size="sm" className="ms-2" />}
+          {autoInferenceResult && (
+            <Badge bg="success" className="ms-2">
+              Auto-configured: {autoInferenceResult.providers} provider{autoInferenceResult.providers !== 1 ? 's' : ''}, {autoInferenceResult.pii} PII field{autoInferenceResult.pii !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        </Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {error && (

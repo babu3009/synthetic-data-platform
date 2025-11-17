@@ -1,0 +1,98 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: Debug (Recommended)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/apps/backend",
+      "python": "C:\\pyenv\\.conda\\envs\\conda-synthetic-data\\python.exe",
+      "envFile": "${workspaceFolder}/apps/backend/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/apps/backend"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "jinja": true
+    },
+    {
+      "name": "Backend: Debug with Reload (Experimental)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "app",
+        "--reload-exclude",
+        "*.log",
+        "--reload-exclude",
+        "__pycache__"
+      ],
+      "cwd": "${workspaceFolder}/apps/backend",
+      "python": "C:\\pyenv\\.conda\\envs\\conda-synthetic-data\\python.exe",
+      "envFile": "${workspaceFolder}/apps/backend/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/apps/backend"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "jinja": true
+    },
+    {
+      "name": "Backend: Run Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "-q",
+        "tests"
+      ],
+      "cwd": "${workspaceFolder}/apps/backend",
+      "python": "C:\\pyenv\\.conda\\envs\\conda-synthetic-data\\python.exe",
+      "envFile": "${workspaceFolder}/apps/backend/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/apps/backend",
+        "PYTEST_CURRENT_TEST": "1"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Chrome: Frontend (Vite)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/apps/frontend",
+      "preLaunchTask": "frontend: dev",
+      "runtimeArgs": [
+        "--new-window"
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Dev: Backend + Frontend",
+      "configurations": [
+        "Backend: Debug (Recommended)",
+        "Chrome: Frontend (Vite)"
+      ],
+      "stopAll": true,
+      "preLaunchTask": null
+    }
+  ]
+}

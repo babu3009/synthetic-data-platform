@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip, Popover } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
 import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
@@ -152,10 +152,70 @@ export default function ProvidersPiiPage() {
   const [lastChangesCount, setLastChangesCount] = useState<number | null>(null)
   const [suggestionsByKey, setSuggestionsByKey] = useState<Record<string, ProviderSuggestion>>({})
   const [summaryCounts, setSummaryCounts] = useState<{ providers: number; pii: number } | null>(null)
+  const [autoSuggestedFor, setAutoSuggestedFor] = useState<string | null>(null)
 
   const projectId = state.projectId || 'default'
 
   const tables = useMemo(() => entity?.tables || [], [entity])
+  
+  // Auto-suggest providers on first load if none are configured
+  const hasConfiguredProviders = useMemo(() => {
+    if (!entity) return true
+    return entity.tables.some(t => 
+      t.columns.some(c => c.provider || c.pii)
+    )
+  }, [entity])
+  
+  // Auto-trigger suggestion on first load for entities without providers
+  useEffect(() => {
+    if (!entity || hasConfiguredProviders || autoSuggestedFor === entity.id || loadingSuggest) return
+    
+    // Auto-trigger suggestion and auto-apply high confidence ones
+    const autoSuggestAndApply = async () => {
+      try {
+        setAutoSuggestedFor(entity.id)
+        setLoadingSuggest(true)
+        
+        const suggestions = (await inferProviders(projectId, entity)) as ProviderSuggestion[]
+        
+        // Auto-apply high confidence suggestions (>= 0.7)
+        const highConfidence = suggestions.filter(s => (s.confidence ?? 0) >= 0.7)
+        
+        if (highConfidence.length > 0) {
+          dispatch({ type: 'applyProviderSuggestions', entityId: entity.id, suggestions: highConfidence })
+          
+          // Calculate summary counts
+          let providerCount = 0
+          let piiCount = 0
+          for (const s of highConfidence) {
+            if (s.provider) providerCount++
+            if (s.pii) piiCount++
+          }
+          
+          setSummaryCounts({ providers: providerCount, pii: piiCount })
+        }
+        
+        // Store remaining lower-confidence suggestions for manual review
+        const remaining = suggestions.filter(s => (s.confidence ?? 0) < 0.7)
+        const map: Record<string, ProviderSuggestion> = {}
+        for (const s of remaining) {
+          map[`${s.table}.${s.column}`] = s
+        }
+        setSuggestionsByKey(map)
+        
+      } catch (e) {
+        // Silently fail auto-suggestion
+        console.warn('Auto-suggestion failed:', e)
+      } finally {
+        setLoadingSuggest(false)
+      }
+    }
+    
+    // Delay slightly to avoid flash on page load
+    const timer = setTimeout(autoSuggestAndApply, 500)
+    
+    return () => clearTimeout(timer)
+  }, [entity?.id, hasConfiguredProviders, autoSuggestedFor, loadingSuggest])
   const visibleRows = useMemo(() => {
     const rows: Array<{ table: string; column: Column }> = []
     if (!entity) return rows
@@ -398,6 +458,11 @@ export default function ProvidersPiiPage() {
         <div className="d-flex align-items-center gap-2">
           <strong>Entity:</strong>
           <span>{entity.name}</span>
+          {!hasConfiguredProviders && autoSuggestedFor === entity.id && (
+            <Alert variant="info" className="mb-0 py-1 px-2 small d-inline-block">
+              <i className="bi bi-magic"></i> Auto-suggesting best providers...
+            </Alert>
+          )}
         </div>
         <div className="d-flex align-items-center gap-2">
           <Form.Select size="sm" value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} aria-label="Filter by table">

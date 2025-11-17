@@ -4,7 +4,7 @@
 
 - **Environment Name**: `conda-synthetic-data`
 - **Python Version**: 3.11.14
-- **Location**: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\`
+- **Location**: `C:\pyenv\.conda\envs\conda-synthetic-data\`
 - **Type**: Conda environment (miniforge3)
 - **Conda Path**: `C:\ProgramData\miniforge3\`
 
@@ -56,7 +56,7 @@ conda deactivate
 
 The workspace is configured to automatically use this environment:
 
-- **Python Interpreter**: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe`
+- **Python Interpreter**: `C:\pyenv\.conda\envs\conda-synthetic-data\python.exe`
 - **Conda Path**: `C:\ProgramData\miniforge3\Scripts\conda.exe`
 - **Environment Manager**: Conda (miniforge3)
 - **Auto-activation**: Enabled for new terminals
@@ -147,7 +147,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 1. Open Command Palette (Ctrl+Shift+P)
 2. Type "Python: Select Interpreter"
 3. Choose `conda-synthetic-data` from the list
-4. Or manually select: `C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe`
+4. Or manually select: `C:\pyenv\.conda\envs\conda-synthetic-data\python.exe`
 5. Reload VS Code window: Ctrl+Shift+P → "Developer: Reload Window"
 
 ### Import Errors
@@ -169,7 +169,7 @@ If `python` command is not found after activation:
 conda activate conda-synthetic-data
 
 # Use full path if needed
-& "C:\Users\Isaiyavan Karan\.conda\envs\conda-synthetic-data\python.exe"
+& "C:\pyenv\.conda\envs\conda-synthetic-data\python.exe"
 
 # Check if activation worked
 Get-Command python

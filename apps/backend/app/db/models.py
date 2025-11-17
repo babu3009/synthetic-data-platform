@@ -80,6 +80,7 @@ class Project(Base):
     requests = relationship("Request", back_populates="project", cascade="all, delete-orphan")
     api_keys = relationship("ApiKey", back_populates="project", cascade="all, delete-orphan")
     audit_events = relationship("AuditEvent", back_populates="project", cascade="all, delete-orphan")
+    wizard_entities = relationship("WizardEntity", back_populates="project", cascade="all, delete-orphan")
     # Optional relationship to owner user for read-only access to email
     owner_user = relationship("User", foreign_keys=[owner_user_id], viewonly=True)
 
@@ -435,3 +436,22 @@ class ProjectLLMSetting(Base):
     project = relationship("Project")
     provider = relationship("LLMProvider")
     model = relationship("LLMModel")
+
+
+class WizardEntity(Base):
+    """Wizard entity configuration for synthetic data generation."""
+    __tablename__ = "wizard_entities"
+    __table_args__ = {"schema": SCHEMA_NAME}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    
+    # Entity schema: tables, columns, relationships, layout
+    schema_json = Column(JSONB, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    project = relationship("Project", back_populates="wizard_entities")

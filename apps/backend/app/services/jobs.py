@@ -3,28 +3,49 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-import redis
-from rq import Queue
+from typing import Optional, Any
 
 from app.core.config import settings
 
 
-def get_redis_connection() -> redis.Redis:
-    """Create a Redis connection from settings."""
-    kwargs = {
-        "host": settings.REDIS_HOST,
-        "port": settings.REDIS_PORT,
-        "db": settings.REDIS_DB,
-        "decode_responses": False,
-    }
-    if settings.REDIS_PASSWORD:
-        kwargs["password"] = settings.REDIS_PASSWORD
-    return redis.Redis(**kwargs)
+def get_redis_connection() -> Optional[Any]:
+    """Create a Redis connection from settings. Returns None if Redis unavailable."""
+    try:
+        import redis
+        kwargs = {
+            "host": settings.REDIS_HOST,
+            "port": settings.REDIS_PORT,
+            "db": settings.REDIS_DB,
+            "decode_responses": False,
+            "socket_connect_timeout": 2,
+            "socket_timeout": 2,
+        }
+        if settings.REDIS_PASSWORD:
+            kwargs["password"] = settings.REDIS_PASSWORD
+        conn = redis.Redis(**kwargs)
+        conn.ping()  # Test connection
+        return conn
+    except Exception:
+        return None
 
 
-def get_queue(name: str = "default") -> Queue:
+def get_queue(name: str = "default") -> Any:
+    """Get queue, returns fake queue if Redis unavailable."""
     conn = get_redis_connection()
-    return Queue(name, connection=conn)
+    if conn is None:
+        # Return fake queue
+        class _FakeJob:
+            def __init__(self):
+                self.id = "fake-job-id"
+        class _FakeQueue:
+            def __init__(self, qname: str):
+                self.name = qname
+            def enqueue(self, func, *args, **kwargs):
+                return _FakeJob()
+        return _FakeQueue(name)
+    else:
+        from rq import Queue
+        return Queue(name, connection=conn)
 
 
 def enqueue_flat_request(request_id: UUID) -> str:
