@@ -81,3 +81,25 @@ async def estimate_request(
     # Authorization: read scope or VIEWER+
     await require_project_scope(str(project_id), required_scopes=["read:project"], required_roles=[ProjectRole.VIEWER, ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
     return await service_estimate_request(db, project_id=project_id, request_id=request_id)
+
+
+@router.delete("/{request_id}", status_code=204)
+async def delete_request(
+    *,
+    db: AsyncSession = Depends(get_db),
+    project_id: UUID,
+    request_id: UUID,
+    principal = Depends(get_current_principal),
+) -> None:
+    """
+    Delete a request by ID.
+    """
+    # Authorization: require write scope or EDITOR/OWNER
+    await require_project_scope(str(project_id), required_scopes=["write:project"], required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
+    
+    # Get the request to ensure it exists and belongs to the project
+    req = await service_get_request(db, project_id=project_id, request_id=request_id)
+    
+    # Delete the request
+    await crud.request.remove(db=db, id=request_id)
+    await db.commit()

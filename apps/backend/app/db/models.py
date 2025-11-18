@@ -150,10 +150,14 @@ class Request(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
+    alias = Column(String(255), nullable=True, index=True)  # Human-readable name like "swift-phoenix"
     type = Column(Enum(RequestType, values_callable=lambda e: [m.value for m in e]), nullable=False, index=True)
-    status = Column(Enum(RequestStatus, values_callable=lambda e: [m.value for m in e]), default=RequestStatus.PENDING, nullable=False, index=True)
+    # Note: DB column is VARCHAR, not PostgreSQL enum, so we use String here
+    status = Column(String(50), default=RequestStatus.PENDING.value, nullable=False, index=True)
     seed = Column(Integer, nullable=True)
     params_json = Column(JSONB, nullable=True)
+    error_message = Column(Text, nullable=True)  # Short error summary
+    error_traceback = Column(Text, nullable=True)  # Full stack trace
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)

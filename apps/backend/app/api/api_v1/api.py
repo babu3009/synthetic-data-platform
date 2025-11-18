@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # Legacy endpoints still imported for health/projects/api_keys/webhooks until modularized
-from app.api.api_v1.endpoints import health, projects, api_keys, webhooks, entities
+from app.api.api_v1.endpoints import health, projects, api_keys, webhooks, entities, ws_requests, ws_project_requests
 
 # Module routers (Phase 1 migration)
 from app.modules.auth.api import router as auth_router
@@ -26,3 +26,8 @@ api_router.include_router(users_router, tags=["Users"])  # /api/v1/users/*
 api_router.include_router(admin_router, tags=["Admin"])  # /api/v1/admin/*
 api_router.include_router(llm_router)  # infer, admin-llm, llm-settings prefixes preserved inside module
 api_router.include_router(synth_router)  # sources, requests, artifacts, flat, validate
+
+# WebSocket endpoints
+api_router.include_router(ws_requests.router, tags=["websockets"])
+api_router.include_router(ws_project_requests.router, tags=["websockets"])
+

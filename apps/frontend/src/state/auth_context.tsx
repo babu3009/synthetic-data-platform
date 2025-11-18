@@ -56,6 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [navigate])
 
   const logout = useCallback(() => {
+    // Dispatch event to cleanup WebSocket connections
+    window.dispatchEvent(new CustomEvent('ws:cleanup'))
+    
     localStorage.removeItem('authToken')
     localStorage.removeItem('access_token')
     localStorage.removeItem('user_role')

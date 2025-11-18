@@ -58,12 +58,6 @@ class Settings(BaseSettings):
             path=self.POSTGRES_DB,
         ))
 
-    # Redis settings
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None
-
     # MinIO settings
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
@@ -130,9 +124,6 @@ class Settings(BaseSettings):
     # Security toggles
     AUTH_DISABLED: bool = False
     API_KEY_HASH_ALGO: str = "sha256"
-
-    # Redis unified URL
-    REDIS_URL: Optional[str] = None
 
     # MinIO extras
     MINIO_SECURE: bool = False

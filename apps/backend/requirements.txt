@@ -38,7 +38,8 @@ starlette==0.49.3
 tomli==2.3.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
-uvicorn==0.38.0
+uvicorn[standard]==0.38.0
+websockets==13.1
 Faker==25.9.1
 redis==5.0.8
 rq==1.16.2

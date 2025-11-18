@@ -1,51 +1,45 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
 from uuid import UUID
+import logging
 
-from typing import Optional, Any
-
-from app.core.config import settings
-
-
-def get_redis_connection() -> Optional[Any]:
-    """Create a Redis connection from settings. Returns None if Redis unavailable."""
-    try:
-        import redis
-        kwargs = {
-            "host": settings.REDIS_HOST,
-            "port": settings.REDIS_PORT,
-            "db": settings.REDIS_DB,
-            "decode_responses": False,
-            "socket_connect_timeout": 2,
-            "socket_timeout": 2,
-        }
-        if settings.REDIS_PASSWORD:
-            kwargs["password"] = settings.REDIS_PASSWORD
-        conn = redis.Redis(**kwargs)
-        conn.ping()  # Test connection
-        return conn
-    except Exception:
-        return None
+logger = logging.getLogger(__name__)
 
 
-def get_queue(name: str = "default") -> Any:
-    """Get queue, returns fake queue if Redis unavailable."""
-    conn = get_redis_connection()
-    if conn is None:
-        # Return fake queue
-        class _FakeJob:
-            def __init__(self):
-                self.id = "fake-job-id"
-        class _FakeQueue:
-            def __init__(self, qname: str):
-                self.name = qname
-            def enqueue(self, func, *args, **kwargs):
-                return _FakeJob()
-        return _FakeQueue(name)
-    else:
-        from rq import Queue
-        return Queue(name, connection=conn)
+class SyncJob:
+    """Synchronous job that executes immediately."""
+    def __init__(self, job_id: str):
+        self.id = job_id
+
+
+class SyncQueue:
+    """Synchronous queue that executes jobs immediately (no Redis/background workers)."""
+    def __init__(self, qname: str):
+        self.name = qname
+    
+    def enqueue(self, func, *args, **kwargs):
+        """Execute job synchronously."""
+        import os
+        
+        # In test mode, don't execute - just return job
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return SyncJob("test-job-id")
+        
+        job_id = f"sync-{func.__name__}-{args[0] if args else 'unknown'}"
+        logger.info(f"Executing {func.__name__} synchronously")
+        try:
+            func(*args)
+            logger.info(f"Job {job_id} completed successfully")
+        except Exception as e:
+            logger.error(f"Job {job_id} failed: {e}", exc_info=True)
+            raise
+        return SyncJob(job_id)
+
+
+def get_queue(name: str = "default") -> SyncQueue:
+    """Get synchronous queue (no Redis required)."""
+    return SyncQueue(name)
 
 
 def enqueue_flat_request(request_id: UUID) -> str:

@@ -190,6 +190,7 @@ def run_relational_job(request_id: str) -> None:
             pass
 
     except Exception as e:  # pragma: no cover
+        import traceback
         try:
             req2 = session.get(Request, UUID(request_id))
             if req2:
@@ -199,6 +200,8 @@ def run_relational_job(request_id: str) -> None:
                     params2 = dict(raw2)
                 params2["error"] = str(e)
                 setattr(req2, "params_json", params2)
+                setattr(req2, "error_message", str(e))
+                setattr(req2, "error_traceback", traceback.format_exc())
                 setattr(req2, "status", RequestStatus.FAILED)
                 setattr(req2, "finished_at", datetime.now(timezone.utc))
                 session.add(req2)

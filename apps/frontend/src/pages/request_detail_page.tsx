@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Alert, Badge, Button, Spinner, Table, Form, Row, Col } from 'react-bootstrap'
 import { useParams } from 'react-router-dom'
-import { getRequest, listArtifacts, signArtifact, type Artifact, type Request } from '../services/requests'
+import { signArtifact, type Artifact, type Request } from '../services/requests'
+
+const WS_MAX_RETRIES = 10
+const WS_RETRY_DELAY = 2000 // 2 seconds
 
 export default function RequestDetailPage() {
   const { projectId, requestId } = useParams<{ projectId: string; requestId: string }>()
   const [req, setReq] = useState<Request | null>(null)
   const [arts, setArts] = useState<Artifact[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [wsError, setWsError] = useState<string | null>(null)
   const [fmt, setFmt] = useState<'all' | Artifact['format']>('all')
   const [fromDate, setFromDate] = useState<string>('')
   const [toDate, setToDate] = useState<string>('')
+  
+  const wsRef = useRef<WebSocket | null>(null)
+  const retryCountRef = useRef(0)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const statusColor = useMemo(() => {
     switch (req?.status) {
@@ -22,35 +30,143 @@ export default function RequestDetailPage() {
   }, [req?.status])
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    async function tick() {
-      try {
-        if (!projectId || !requestId) return
-        const r = await getRequest(projectId, requestId)
-        setReq(r)
-        if (r.status === 'completed' || r.status === 'failed' || r.status === 'cancelled') {
-          const a = await listArtifacts(r.id)
-          setArts(a)
-          return // stop polling
-        }
-      } catch (e: unknown) {
-        setError((e as Error)?.message || 'Failed to fetch request')
+    if (!requestId) return
+
+    // Listen for logout event to cleanup WebSocket
+    const handleWsCleanup = () => {
+      if (wsRef.current) {
+        wsRef.current.close(1000, 'User logged out')
+        wsRef.current = null
       }
-      timer = setTimeout(tick, 2000)
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
     }
-    tick()
-    return () => { if (timer) clearTimeout(timer) }
-  }, [projectId, requestId])
+
+    window.addEventListener('ws:cleanup', handleWsCleanup)
+
+    const connectWebSocket = () => {
+      // Close existing connection if any
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/ws/requests/${requestId}`
+      
+      const ws = new WebSocket(wsUrl)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        console.log('WebSocket connected')
+        retryCountRef.current = 0 // Reset retry count on successful connection
+        setWsError(null)
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          
+          switch (data.type) {
+            case 'status':
+              setReq({
+                id: data.request_id,
+                project_id: projectId || '',
+                type: req?.type || 'relational',
+                alias: data.alias || req?.alias,
+                status: data.status,
+                created_at: data.created_at,
+                started_at: data.started_at,
+                finished_at: data.finished_at,
+              } as Request)
+              break
+            
+            case 'artifacts':
+              setArts(data.artifacts.map((a: any) => ({
+                id: a.id,
+                request_id: requestId || '',
+                format: a.format,
+                size_bytes: a.size_bytes,
+                storage_uri: a.storage_uri,
+                created_at: a.created_at,
+              })))
+              break
+            
+            case 'complete':
+              // Connection will close after this
+              break
+            
+            case 'error':
+              setError(data.message)
+              break
+          }
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e)
+        }
+      }
+
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event)
+      }
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason)
+        wsRef.current = null
+
+        // Only retry if not a normal closure and haven't exceeded max retries
+        if (event.code !== 1000 && retryCountRef.current < WS_MAX_RETRIES) {
+          retryCountRef.current++
+          console.log(`Reconnecting... Attempt ${retryCountRef.current}/${WS_MAX_RETRIES}`)
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket()
+          }, WS_RETRY_DELAY)
+        } else if (retryCountRef.current >= WS_MAX_RETRIES) {
+          setWsError('Connection lost. Please refresh the page to reconnect.')
+        }
+      }
+    }
+
+    connectWebSocket()
+
+    return () => {
+      // Cleanup on unmount
+      window.removeEventListener('ws:cleanup', handleWsCleanup)
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (wsRef.current) {
+        wsRef.current.close(1000, 'Component unmounted')
+      }
+    }
+  }, [requestId, projectId])
 
   return (
     <div className="container py-3">
       <h3>Request Detail</h3>
       {error && <Alert variant="danger">{error}</Alert>}
+      {wsError && (
+        <Alert variant="warning">
+          {wsError}
+          {retryCountRef.current >= WS_MAX_RETRIES && (
+            <Button size="sm" variant="link" onClick={() => window.location.reload()}>
+              Refresh Now
+            </Button>
+          )}
+        </Alert>
+      )}
       {!req && !error && (
-        <div className="d-flex align-items-center gap-2"><Spinner animation="border" size="sm" /><span>Loading…</span></div>
+        <div className="d-flex align-items-center gap-2"><Spinner animation="border" size="sm" /><span>Connecting…</span></div>
       )}
       {req && (
         <div className="mb-3">
+          {req.alias && (
+            <div className="mb-2">
+              <h4 className="text-primary">{req.alias}</h4>
+            </div>
+          )}
           <div><strong>ID:</strong> {req.id}</div>
           <div><strong>Type:</strong> {req.type}</div>
           <div><strong>Status:</strong> <Badge bg={statusColor}>{req.status}</Badge></div>

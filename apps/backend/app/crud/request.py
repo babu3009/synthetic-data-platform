@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from app.crud.base import CRUDBase
 from app.db.models import Request, RequestStatus
 from app.schemas.request import RequestCreate, RequestUpdate
+from app.utils.name_generator import generate_unique_alias
 
 
 class CRUDRequest(CRUDBase[Request, RequestCreate, RequestUpdate]):
@@ -45,6 +46,18 @@ class CRUDRequest(CRUDBase[Request, RequestCreate, RequestUpdate]):
         """Create request with project association."""
         obj_in_data = obj_in.model_dump()
         obj_in_data["project_id"] = project_id
+        
+        # Generate alias if not provided
+        if not obj_in_data.get("alias"):
+            # Get existing aliases for this project to ensure uniqueness
+            result = await db.execute(
+                select(Request.alias)
+                .where(Request.project_id == project_id)
+                .where(Request.alias.isnot(None))
+            )
+            existing_aliases = set(row[0] for row in result.all())
+            obj_in_data["alias"] = generate_unique_alias(existing_aliases)
+        
         db_obj = Request(**obj_in_data)
         db.add(db_obj)
         await db.commit()

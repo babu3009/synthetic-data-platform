@@ -24,7 +24,6 @@ try:
     )
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
     from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor  # type: ignore
-    from opentelemetry.instrumentation.redis import RedisInstrumentor  # type: ignore
     from opentelemetry.instrumentation.requests import RequestsInstrumentor  # type: ignore
 except Exception:  # pragma: no cover - optional dep
     trace = None  # type: ignore
@@ -34,7 +33,6 @@ except Exception:  # pragma: no cover - optional dep
     OTLPSpanExporter = None  # type: ignore
     FastAPIInstrumentor = None  # type: ignore
     Psycopg2Instrumentor = None  # type: ignore
-    RedisInstrumentor = None  # type: ignore
     RequestsInstrumentor = None  # type: ignore
 
 
@@ -88,9 +86,6 @@ def init_observability(app: FastAPI) -> None:
                 FastAPIInstrumentor.instrument_app(app)
             if Psycopg2Instrumentor is not None:
                 Psycopg2Instrumentor().instrument()
-            # Skip Redis instrumentation - Redis is optional
-            # if RedisInstrumentor is not None:
-            #     RedisInstrumentor().instrument()
             if RequestsInstrumentor is not None:
                 RequestsInstrumentor().instrument()
         except Exception:

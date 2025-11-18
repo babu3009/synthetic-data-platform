@@ -183,6 +183,7 @@ def run_flat_job(request_id: str) -> None:
             pass
 
     except Exception as e:  # pragma: no cover
+        import traceback
         try:
             req2 = session.get(Request, UUID(request_id))
             if req2:
@@ -193,6 +194,8 @@ def run_flat_job(request_id: str) -> None:
                     params2 = dict(raw)
                 params2["error"] = str(e)
                 req2_obj.params_json = params2
+                req2_obj.error_message = str(e)
+                req2_obj.error_traceback = traceback.format_exc()
                 req2_obj.status = RequestStatus.FAILED
                 req2_obj.finished_at = datetime.now(timezone.utc)
                 session.add(req2_obj)

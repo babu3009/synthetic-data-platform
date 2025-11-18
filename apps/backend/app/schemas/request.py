@@ -14,6 +14,7 @@ from app.db.models import RequestType, RequestStatus
 class RequestBase(BaseModel):
     """Base request schema."""
     type: RequestType = Field(..., description="Type of synthetic data request")
+    alias: Optional[str] = Field(None, description="Human-readable name like 'swift-phoenix'")
     seed: Optional[int] = Field(None, description="Random seed for reproducibility")
     params_json: Optional[Dict[str, Any]] = Field(None, description="Request parameters as JSON")
 
@@ -25,6 +26,7 @@ class RequestCreate(RequestBase):
 
 class RequestUpdate(BaseModel):
     """Schema for updating a request."""
+    alias: Optional[str] = None
     status: Optional[RequestStatus] = None
     seed: Optional[int] = None
     params_json: Optional[Dict[str, Any]] = None
@@ -37,6 +39,8 @@ class RequestInDBBase(RequestBase):
     id: UUID
     project_id: UUID
     status: RequestStatus
+    error_message: Optional[str] = None
+    error_traceback: Optional[str] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None

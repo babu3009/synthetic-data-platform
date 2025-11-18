@@ -6,7 +6,10 @@ export type Request = {
   id: string
   project_id: string
   type: RequestType
+  alias?: string
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  error_message?: string
+  error_traceback?: string
   seed?: number
   params_json?: unknown
   created_at: string
@@ -69,4 +72,8 @@ export async function signArtifact(requestId: string, artifactId: string) {
   // Backend returns { url: string, expires_at?: string }
   const res = await api.get(`/api/v1/requests/${requestId}/artifacts/${artifactId}:sign`)
   return res.data as { url: string; expires_at?: string }
+}
+
+export async function deleteRequest(projectId: string, requestId: string) {
+  await api.delete(`/api/v1/projects/${projectId}/requests/${requestId}`)
 }

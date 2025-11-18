@@ -11,15 +11,17 @@ function AppNavbar() {
   const projectId = projectMatch ? projectMatch[1] : undefined
   const llmSettingsHref = projectId ? `/projects/${projectId}/llm-settings` : '/projects/placeholder/llm-settings'
   const wizardHref = projectId ? `/projects/${projectId}/wizard` : '/wizard'
+  const requestsHref = projectId ? `/projects/${projectId}/requests` : '/requests'
   const llmProvidersHref = projectId ? `/admin/${projectId}/llm-providers` : '/admin/llm-providers'
   const [showPicker, setShowPicker] = React.useState(false)
-  const [pendingAction, setPendingAction] = React.useState<'settings' | 'providers' | 'wizard' | null>(null)
+  const [pendingAction, setPendingAction] = React.useState<'settings' | 'providers' | 'wizard' | 'requests' | null>(null)
   const navigate = useNavigate()
 
-  function handleNavigate(target: 'settings' | 'providers' | 'wizard') {
+  function handleNavigate(target: 'settings' | 'providers' | 'wizard' | 'requests') {
     if (projectId) {
       if (target === 'settings') navigate(llmSettingsHref)
       else if (target === 'providers') navigate(llmProvidersHref)
+      else if (target === 'requests') navigate(requestsHref)
       else navigate(wizardHref)
     } else {
       setPendingAction(target)
@@ -46,6 +48,15 @@ function AppNavbar() {
               aria-label="Data Wizard"
             >
               Data Wizard
+            </Nav.Link>
+            <Nav.Link
+              as={Link}
+              to={requestsHref}
+              onClick={(e) => { if (!projectId) { e.preventDefault(); handleNavigate('requests') } }}
+              active={/\/requests($|\/)/.test(location.pathname)}
+              aria-label="Requests"
+            >
+              Requests
             </Nav.Link>
             <Nav.Link as={Link} to="/datasets" active={location.pathname === '/datasets'}>Datasets</Nav.Link>
             <Nav.Link as={Link} to="/analytics" active={location.pathname === '/analytics'}>Analytics</Nav.Link>
@@ -107,6 +118,7 @@ function AppNavbar() {
           setShowPicker(false)
           if (pendingAction === 'settings') navigate(`/projects/${pid}/llm-settings`)
           else if (pendingAction === 'providers') navigate(`/admin/${pid}/llm-providers`)
+          else if (pendingAction === 'requests') navigate(`/projects/${pid}/requests`)
           else navigate(`/projects/${pid}/wizard`)
           setPendingAction(null)
         }}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Alert, Button, Col, Form, Row, Table } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../../state/wizard'
@@ -8,6 +8,14 @@ import { createRequest, estimateRequest, startRequest } from '../../services/req
 type Format = 'csv' | 'xlsx' | 'parquet' | 'jsonl'
 type Destination = 'download' | 'object-store' | 'db-writeback' | 'kafka'
 
+function generateAlias() {
+  const adjectives = ['swift', 'bright', 'clever', 'dynamic', 'elegant', 'flowing', 'golden', 'heroic', 'infinite', 'jovial', 'keen', 'lively', 'mystic', 'noble', 'optimal', 'pristine', 'quantum', 'radiant', 'stellar', 'turbo']
+  const nouns = ['atlas', 'beacon', 'catalyst', 'dataset', 'eclipse', 'falcon', 'galaxy', 'horizon', 'insight', 'journey', 'keystone', 'lightning', 'matrix', 'nexus', 'oracle', 'phoenix', 'quasar', 'reactor', 'spectrum', 'titan']
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+  const noun = nouns[Math.floor(Math.random() * nouns.length)]
+  return `${adj}-${noun}`
+}
+
 export default function OutputsRunPage() {
   const { state } = useWizard()
   const navigate = useNavigate()
@@ -16,10 +24,16 @@ export default function OutputsRunPage() {
   const [formats, setFormats] = useState<Record<Format, boolean>>({ csv: true, xlsx: true, parquet: false, jsonl: false })
   const [destination, setDestination] = useState<Destination>('download')
   const [schedule, setSchedule] = useState<string>('') // ISO datetime-local string
+  const [alias, setAlias] = useState<string>('')
   const [estimating, setEstimating] = useState(false)
   const [estimate, setEstimate] = useState<{ rows?: number; size_bytes?: number; seconds?: number } | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Auto-generate alias on component mount
+  useEffect(() => {
+    setAlias(generateAlias())
+  }, [])
 
   const projectId = state.projectId
 
@@ -47,6 +61,7 @@ export default function OutputsRunPage() {
       }
       const payload = {
         type,
+        alias: alias || undefined,
         params_json: {
           schema,
           outputs: { formats: formatsArray(), destination },
@@ -77,6 +92,7 @@ export default function OutputsRunPage() {
       }
       const payload = {
         type,
+        alias: alias || undefined,
         params_json: {
           schema,
           outputs: { formats: formatsArray(), destination },
@@ -130,6 +146,18 @@ export default function OutputsRunPage() {
       </Row>
 
       <Row className="mb-3">
+        <Col md={6}>
+          <Form.Group controlId="alias">
+            <Form.Label>Request name</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="e.g., swift-phoenix"
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+            />
+            <Form.Text muted>A memorable name for this request. Feel free to change it.</Form.Text>
+          </Form.Group>
+        </Col>
         <Col md={6}>
           <Form.Group controlId="schedule">
             <Form.Label>Optional schedule</Form.Label>
