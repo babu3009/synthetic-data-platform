@@ -50,7 +50,14 @@ class ProviderRegistry:
             if config in PII_CATALOG:
                 cfg = PII_CATALOG[config]
             else:
-                cfg = json.loads(config)
+                # Try to parse as JSON, if empty or invalid, treat as unknown type
+                config = config.strip()
+                if not config:
+                    raise ValueError("Empty provider config string")
+                try:
+                    cfg = json.loads(config)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON in provider config: {config[:100]}") from e
         elif isinstance(config, dict):
             cfg = config
         else:

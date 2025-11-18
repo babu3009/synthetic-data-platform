@@ -13,5 +13,5 @@ router.include_router(legacy_sources.router, prefix="/projects/{project_id}/sour
 router.include_router(legacy_requests.router, prefix="/projects/{project_id}/requests", tags=["requests"])
 router.include_router(legacy_artifacts.router, prefix="/requests", tags=["artifacts"])
 router.include_router(legacy_flat.router, prefix="/flat", tags=["flat"])  # preview endpoints
-router.include_router(legacy_flat.req_router, prefix="/requests", tags=["requests"])  # job start endpoints
+router.include_router(legacy_flat.req_router, prefix="/projects/{project_id}/requests", tags=["requests"])  # job start endpoints
 router.include_router(legacy_validate.router, tags=["validate"])  # validation endpoints

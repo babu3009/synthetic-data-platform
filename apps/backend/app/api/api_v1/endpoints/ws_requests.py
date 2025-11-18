@@ -72,12 +72,18 @@ async def websocket_request_status(
                         break
                     
                     # Send status update
+                    # Include progress from params_json if available
+                    progress = None
+                    if req.params_json and isinstance(req.params_json, dict):
+                        progress = req.params_json.get("progress")
+                    
                     status_data = {
                         "type": "status",
                         "request_id": str(req.id),
                         "alias": req.alias,
                         "status": req.status,
                         "error_message": req.error_message,
+                        "progress": progress,  # Include progress for real-time updates
                         "created_at": req.created_at.isoformat() if req.created_at else None,
                         "started_at": req.started_at.isoformat() if req.started_at else None,
                         "finished_at": req.finished_at.isoformat() if req.finished_at else None,

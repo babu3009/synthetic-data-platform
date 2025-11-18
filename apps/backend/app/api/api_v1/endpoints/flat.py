@@ -34,13 +34,16 @@ async def flat_preview(payload: Dict[str, Any]):
 
 @req_router.post("/{request_id}:start", response_model=schemas.Request)
 async def start_request(
-    *, db: AsyncSession = Depends(get_db), request_id: UUID, principal = Depends(get_current_principal)
+    *, db: AsyncSession = Depends(get_db), project_id: UUID, request_id: UUID, principal = Depends(get_current_principal)
 ) -> schemas.Request:
     req = await crud.request.get(db=db, id=request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    # Verify request belongs to the project
+    if req.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Request not found")
     # Authorization: require run:request or EDITOR/OWNER on the project
-    await require_project_scope(str(req.project_id), required_scopes=["run:request"], required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
+    await require_project_scope(str(project_id), required_scopes=["run:request"], required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
     # Return refreshed request
     # Pass module-level get_queue so tests can monkeypatch flat_endpoint.get_queue
     return await service_start_request_job(db, request_id=request_id, get_queue_fn=get_queue)

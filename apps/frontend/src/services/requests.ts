@@ -2,6 +2,13 @@ import api from './api'
 
 export type RequestType = 'relational' | 'flat' | 'timeseries'
 
+export type RequestParams = {
+  progress?: number
+  schema?: unknown
+  outputs?: unknown
+  [key: string]: unknown
+}
+
 export type Request = {
   id: string
   project_id: string
@@ -11,7 +18,7 @@ export type Request = {
   error_message?: string
   error_traceback?: string
   seed?: number
-  params_json?: unknown
+  params_json?: RequestParams
   created_at: string
   started_at?: string
   finished_at?: string
@@ -31,8 +38,8 @@ export async function createRequest(projectId: string, payload: Partial<Request>
   return res.data as Request
 }
 
-export async function startRequest(requestId: string) {
-  const res = await api.post(`/api/v1/requests/${requestId}:start`)
+export async function startRequest(projectId: string, requestId: string) {
+  const res = await api.post(`/api/v1/projects/${projectId}/requests/${requestId}:start`)
   return res.data as Request
 }
 
@@ -76,4 +83,9 @@ export async function signArtifact(requestId: string, artifactId: string) {
 
 export async function deleteRequest(projectId: string, requestId: string) {
   await api.delete(`/api/v1/projects/${projectId}/requests/${requestId}`)
+}
+
+export async function restartRequest(projectId: string, requestId: string) {
+  const res = await api.post(`/api/v1/projects/${projectId}/requests/${requestId}:restart`)
+  return res.data as Request
 }

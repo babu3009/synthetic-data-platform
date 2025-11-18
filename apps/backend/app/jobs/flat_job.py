@@ -35,13 +35,19 @@ def run_flat_job(request_id: str) -> None:
             req: Request | None = session.get(Request, rid)
             if not req:
                 return
-            # Avoid InstrumentedAttribute comparison issues
-            if str(getattr(req, "type", "")) != RequestType.FLAT:
+            # Handle both enum objects and string values
+            req_type = getattr(req, "type", None)
+            if isinstance(req_type, str):
+                req_type_str = req_type
+            else:
+                req_type_str = req_type.value if hasattr(req_type, 'value') else str(req_type)
+            
+            if req_type_str != RequestType.FLAT.value:
                 return
 
             now = datetime.now(timezone.utc)
             req_obj: Any = req
-            req_obj.status = RequestStatus.RUNNING
+            req_obj.status = RequestStatus.RUNNING.value
             req_obj.started_at = now
             session.add(req_obj)
             session.commit()
@@ -73,13 +79,18 @@ def run_flat_job(request_id: str) -> None:
             if not schema:
                 raise ValueError("Missing schema in request params_json")
             total_rows = int(params.get("rows", 1000))
-            formats: List[str] = params.get("formats", [ArtifactFormat.CSV.value])
-            chunk_size = int(params.get("chunk_size", 50_000))
+            
+            # Get formats from outputs.formats or fall back to params.formats or default
             outputs: Dict[str, Any] = params.get("outputs", {}) if isinstance(params.get("outputs"), dict) else {}
+            formats: List[str] = outputs.get("formats") or params.get("formats", [ArtifactFormat.CSV.value])
+            
+            chunk_size = int(params.get("chunk_size", 50_000))
             db_writeback = outputs.get("db") if isinstance(outputs.get("db"), dict) else None
             kafka_publish = outputs.get("kafka") if isinstance(outputs.get("kafka"), dict) else None
 
-            tmp_dir = Path("storage/tmp") / request_id
+            # Use absolute path for tmp directory
+            backend_root = Path(__file__).resolve().parents[2]  # Go up from jobs/ to backend/
+            tmp_dir = backend_root / "storage" / "tmp" / request_id
             tmp_dir.mkdir(parents=True, exist_ok=True)
 
             paths, stats = generate_to_artifacts(
@@ -96,11 +107,22 @@ def run_flat_job(request_id: str) -> None:
             if job is not None:
                 job.meta["progress"] = 90
                 job.save_meta()
+            
+            # Update params_json with progress
+            try:
+                current_params = dict(params)
+                current_params["progress"] = 90
+                setattr(req_obj, "params_json", current_params)
+                session.add(req_obj)
+                session.commit()
+            except Exception:
+                pass  # Best effort
+            
             post_run_status(
                 webhook,
                 {
                     "project_id": str(getattr(req_obj, "project_id", "")),
-                    "request_id": request_id,
+                    "request_id": str(request_id),
                     "status": "running",
                     "progress": 90,
                 },
@@ -151,11 +173,12 @@ def run_flat_job(request_id: str) -> None:
             except Exception:
                 pass
 
-            # persist stats into params_json["stats"]
+            # persist stats into params_json["stats"] and progress
             new_params = dict(params)
             new_params["stats"] = stats
+            new_params["progress"] = 100  # Persist final progress
             req_obj.params_json = new_params
-            req_obj.status = RequestStatus.COMPLETED
+            req_obj.status = RequestStatus.COMPLETED.value
             req_obj.finished_at = datetime.now(timezone.utc)
             session.add(req_obj)
             session.commit()
@@ -196,7 +219,7 @@ def run_flat_job(request_id: str) -> None:
                 req2_obj.params_json = params2
                 req2_obj.error_message = str(e)
                 req2_obj.error_traceback = traceback.format_exc()
-                req2_obj.status = RequestStatus.FAILED
+                req2_obj.status = RequestStatus.FAILED.value
                 req2_obj.finished_at = datetime.now(timezone.utc)
                 session.add(req2_obj)
                 session.commit()

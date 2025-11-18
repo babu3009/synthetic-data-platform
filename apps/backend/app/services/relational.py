@@ -64,6 +64,32 @@ def _build_generators(table: Dict[str, Any], seed: int) -> List[Tuple[str, Any]]
     for col in table.get("columns", []):
         name = col["name"]
         provider_cfg = col.get("provider") or {"type": "sequence"}
+        
+        # Handle string provider values (e.g., "faker") - convert to proper config
+        if isinstance(provider_cfg, str):
+            provider_type = provider_cfg
+            # Map common string values to provider configs
+            if provider_type == "faker":
+                # Default faker provider with random method based on column name/type
+                dtype = col.get("dtype", "text").lower()
+                if "name" in name.lower():
+                    provider_cfg = {"type": "faker", "method": "name"}
+                elif "email" in name.lower():
+                    provider_cfg = {"type": "faker", "method": "email"}
+                elif "phone" in name.lower():
+                    provider_cfg = {"type": "faker", "method": "phone_number"}
+                elif "address" in name.lower():
+                    provider_cfg = {"type": "faker", "method": "address"}
+                elif "date" in dtype or "date" in name.lower():
+                    provider_cfg = {"type": "faker", "method": "date"}
+                elif dtype in ("int", "integer", "bigint"):
+                    provider_cfg = {"type": "faker", "method": "random_int", "min": 1, "max": 100000}
+                else:
+                    provider_cfg = {"type": "faker", "method": "word"}
+            else:
+                # Unknown string type, use sequence as fallback
+                provider_cfg = {"type": "sequence"}
+        
         if col.get("unique"):
             provider_cfg = {**provider_cfg, "unique": True}
         gen = ProviderRegistry.from_config(provider_cfg)
@@ -71,8 +97,16 @@ def _build_generators(table: Dict[str, Any], seed: int) -> List[Tuple[str, Any]]
     return gens
 
 
-def _build_fk_defs(table: Dict[str, Any]) -> List[FKRef]:
+def _build_fk_defs(table: Dict[str, Any], schema_relationships: Optional[List[Dict[str, Any]]] = None) -> List[FKRef]:
+    """
+    Build FK definitions for a table from:
+    1. Column-level fk attributes (legacy format)
+    2. Schema-level relationships array (new format from wizard)
+    """
     fks: List[FKRef] = []
+    table_name = table.get("name")
+    
+    # Legacy: Extract from column.fk
     for col in table.get("columns", []):
         fk = col.get("fk")
         if fk:
@@ -85,6 +119,33 @@ def _build_fk_defs(table: Dict[str, Any]) -> List[FKRef]:
                     sampling=fk.get("sampling", "uniform"),
                 )
             )
+    
+    # New: Extract from schema.relationships array
+    if schema_relationships and table_name:
+        for rel in schema_relationships:
+            # Check if this relationship targets current table
+            if rel.get("targetTable") == table_name:
+                target_col = rel.get("targetColumn")
+                source_table = rel.get("sourceTable")
+                source_col = rel.get("sourceColumn")
+                
+                if target_col and source_table and source_col:
+                    # Check if we already have this FK from column-level definition
+                    if not any(fk.column == target_col and fk.to_table == source_table for fk in fks):
+                        # Determine nullable from column definition
+                        col_def = next((c for c in table.get("columns", []) if c.get("name") == target_col), None)
+                        nullable = col_def.get("nullable", False) if col_def else False
+                        
+                        fks.append(
+                            FKRef(
+                                column=target_col,
+                                to_table=source_table,
+                                to_column=source_col,
+                                nullable=nullable,
+                                sampling="uniform",  # Default to uniform sampling
+                            )
+                        )
+    
     return fks
 
 
@@ -205,6 +266,7 @@ def generate_to_artifacts(
             )
 
     # Generation
+    schema_relationships = schema.get("relationships", [])
     for tname in order:
         table = table_map[tname]
         # Determine number of rows robustly (guard against None)
@@ -216,16 +278,35 @@ def generate_to_artifacts(
             continue
         gens = _build_generators(table, seed)
         null_probs = {c["name"]: c.get("null_prob", 0.0) for c in table.get("columns", [])}
-        # Identify PK columns (assume single-column pk for simplicity)
-        pk_cols = [c["name"] for c in table.get("columns", []) if c.get("pk")]
-        pk_col = pk_cols[0] if pk_cols else None
-        # FK defs
-        fk_defs = _build_fk_defs(table)
+        
+        # Identify PK columns - support both column-level and table-level pk definitions
+        pk_cols_from_columns = [c["name"] for c in table.get("columns", []) if c.get("pk")]
+        pk_cols_from_table = table.get("pk", [])
+        # Prefer table-level pk definition (wizard format), fallback to column-level
+        pk_cols = pk_cols_from_table if pk_cols_from_table else pk_cols_from_columns
+        
+        # Find the first PK that actually exists as a column
+        column_names = {c["name"] for c in table.get("columns", [])}
+        pk_col = None
+        for pk in pk_cols:
+            if pk in column_names:
+                pk_col = pk
+                break
+        
+        # FK defs - now pass schema relationships
+        fk_defs = _build_fk_defs(table, schema_relationships)
 
         # Maintain continuous sequence values across chunks per column when provider is sequence
         seq_state: Dict[str, Dict[str, Any]] = {}
         for cdef in table.get("columns", []):
             pc = cdef.get("provider") or {}
+            # Handle string provider values (same as in _build_generators)
+            if isinstance(pc, str):
+                if pc == "faker":
+                    pc = {"type": "faker", "method": "word"}  # Default faker config
+                else:
+                    pc = {"type": "sequence"}  # Fallback to sequence
+            
             if pc.get("type") == "sequence":
                 start = int(pc.get("start", 0))
                 step = int(pc.get("step", 1))

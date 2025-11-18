@@ -100,9 +100,8 @@ export default function OutputsRunPage() {
         },
       }
       const req = await createRequest(projectId, payload)
-      // Immediately start the request
-      await startRequest(req.id)
-      // Navigate to request detail page
+      // Navigate to request detail page (user can start it from there)
+      // Don't auto-start to avoid timeout issues with synchronous job execution
       navigate(`/projects/${projectId}/requests/${req.id}`)
     } catch (e: unknown) {
       const errMsg = (e as any)?.response?.data?.detail || (e as Error)?.message || 'Failed to create request'

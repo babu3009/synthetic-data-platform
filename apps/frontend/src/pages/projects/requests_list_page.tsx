@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Badge, Button, Modal, ProgressBar, Spinner, Table } from 'react-bootstrap'
-import { listRequests, deleteRequest, type Request } from '../../services/requests'
+import { listRequests, deleteRequest, startRequest, restartRequest, type Request } from '../../services/requests'
 
 const statusVariant: Record<Request['status'], string> = {
   pending: 'secondary',
@@ -21,6 +21,8 @@ export default function RequestsListPage() {
   const [selectedError, setSelectedError] = useState<{ message: string; traceback: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; alias?: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [starting, setStarting] = useState<string | null>(null)
+  const [restarting, setRestarting] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   
   // Fetch initial requests
@@ -132,6 +134,39 @@ export default function RequestsListPage() {
       alert(`Failed to delete request: ${(e as Error).message}`)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleStart = async (requestId: string) => {
+    try {
+      setStarting(requestId)
+      await startRequest(pid, requestId)
+      // Update status optimistically
+      setRequests(prev => prev.map(r => 
+        r.id === requestId ? { ...r, status: 'running' as const } : r
+      ))
+    } catch (e: unknown) {
+      alert(`Failed to start request: ${(e as Error).message}`)
+    } finally {
+      setStarting(null)
+    }
+  }
+
+  const handleRestart = async (requestId: string) => {
+    try {
+      setRestarting(requestId)
+      const newRequest = await restartRequest(pid, requestId)
+      // Add the new request to the list and start it immediately
+      setRequests(prev => [newRequest, ...prev])
+      // Auto-start the new request
+      await startRequest(pid, newRequest.id)
+      setRequests(prev => prev.map(r => 
+        r.id === newRequest.id ? { ...r, status: 'running' as const } : r
+      ))
+    } catch (e: unknown) {
+      alert(`Failed to restart request: ${(e as Error).message}`)
+    } finally {
+      setRestarting(null)
     }
   }
   
@@ -265,6 +300,46 @@ export default function RequestsListPage() {
               </td>
               <td className="text-end">
                 <div className="d-flex gap-2 justify-content-end">
+                  {r.status === 'pending' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline-success" 
+                      onClick={() => handleStart(r.id)}
+                      disabled={starting === r.id}
+                      title="Start request execution"
+                    >
+                      {starting === r.id ? (
+                        <>
+                          <Spinner as="span" animation="border" size="sm" className="me-1" />
+                          Starting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-play-fill"></i> Start
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {(r.status === 'completed' || r.status === 'failed') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline-info" 
+                      onClick={() => handleRestart(r.id)}
+                      disabled={restarting === r.id}
+                      title="Restart with new seed to generate new data"
+                    >
+                      {restarting === r.id ? (
+                        <>
+                          <Spinner as="span" animation="border" size="sm" className="me-1" />
+                          Restarting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-arrow-clockwise"></i> Restart
+                        </>
+                      )}
+                    </Button>
+                  )}
                   <Link className="btn btn-sm btn-outline-primary" to={`/projects/${pid}/requests/${r.id}`}>
                     View
                   </Link>

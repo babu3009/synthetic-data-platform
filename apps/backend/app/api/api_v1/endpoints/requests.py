@@ -103,3 +103,35 @@ async def delete_request(
     # Delete the request
     await crud.request.remove(db=db, id=request_id)
     await db.commit()
+
+
+@router.post("/{request_id}:restart", response_model=schemas.Request, status_code=201)
+async def restart_request(
+    *,
+    db: AsyncSession = Depends(get_db),
+    project_id: UUID,
+    request_id: UUID,
+    principal = Depends(get_current_principal),
+) -> schemas.Request:
+    """
+    Restart a completed/failed request by creating a new request with the same configuration.
+    Generates new synthetic data with a different seed.
+    """
+    # Authorization: require write scope or EDITOR/OWNER
+    await require_project_scope(str(project_id), required_scopes=["write:project"], required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER], principal=principal, db=db)
+    
+    # Get the original request
+    original = await service_get_request(db, project_id=project_id, request_id=request_id)
+    
+    # Create a new request with the same configuration but a new seed
+    import random
+    new_seed = random.randint(1, 2**31 - 1)
+    
+    request_in = schemas.RequestCreate(
+        type=original.type,
+        params_json=original.params_json,
+        seed=new_seed,
+        alias=f"{original.alias or 'request'}-restart" if original.alias else None
+    )
+    
+    return await service_create_request(db, project_id=project_id, request_in=request_in)
