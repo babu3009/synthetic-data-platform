@@ -12,6 +12,7 @@ type Props = {
 
 export default function EditEntityModal({ show, onHide, entity, existingNames, onUpdated }: Props) {
   const [name, setName] = useState(entity.name)
+  const [description, setDescription] = useState(entity.description || '')
   const [tables, setTables] = useState<EntityTable[]>(entity.tables || [])
   const [error, setError] = useState<string | null>(null)
 
@@ -25,6 +26,7 @@ export default function EditEntityModal({ show, onHide, entity, existingNames, o
     onHide()
     setTimeout(() => {
       setName(entity.name)
+      setDescription(entity.description || '')
       setTables(entity.tables || [])
       setError(null)
     }, 200)
@@ -86,6 +88,7 @@ export default function EditEntityModal({ show, onHide, entity, existingNames, o
     const updated: EntitySchema = {
       ...entity,
       name: name.trim(),
+      description: description.trim() || undefined,
       tables,
       updatedAt: new Date().toISOString(),
     }
@@ -113,6 +116,17 @@ export default function EditEntityModal({ show, onHide, entity, existingNames, o
             isInvalid={!!name && !nameUnique}
           />
           <Form.Control.Feedback type="invalid">Name must be unique in this project.</Form.Control.Feedback>
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="entityDescription">
+          <Form.Label>Description (optional)</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={2}
+            placeholder="Brief description of this entity's purpose..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </Form.Group>
 
         <div className="d-flex justify-content-between align-items-center mb-2">

@@ -65,10 +65,14 @@ async def websocket_request_status(
                 try:
                     req = await crud.request.get(db=db, id=UUID(request_id))
                     if not req:
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": "Request not found"
-                        })
+                        try:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Request not found"
+                            })
+                        except (WebSocketDisconnect, RuntimeError):
+                            # Client disconnected, exit gracefully
+                            break
                         break
                     
                     # Send status update
@@ -88,7 +92,12 @@ async def websocket_request_status(
                         "started_at": req.started_at.isoformat() if req.started_at else None,
                         "finished_at": req.finished_at.isoformat() if req.finished_at else None,
                     }
-                    await websocket.send_json(status_data)
+                    
+                    try:
+                        await websocket.send_json(status_data)
+                    except (WebSocketDisconnect, RuntimeError):
+                        # Client disconnected during send, exit gracefully
+                        break
                     
                     # If request is terminal, send artifacts and close
                     if req.status in ["completed", "failed", "cancelled"]:
@@ -106,24 +115,36 @@ async def websocket_request_status(
                                 for a in artifacts
                             ]
                         }
-                        await websocket.send_json(artifacts_data)
                         
-                        # Send completion message
-                        await websocket.send_json({
-                            "type": "complete",
-                            "status": req.status
-                        })
+                        try:
+                            await websocket.send_json(artifacts_data)
+                            
+                            # Send completion message
+                            await websocket.send_json({
+                                "type": "complete",
+                                "status": req.status
+                            })
+                        except (WebSocketDisconnect, RuntimeError):
+                            # Client disconnected before final messages, that's OK
+                            pass
                         break
                     
                     # Wait before next poll (2 seconds)
                     await asyncio.sleep(2)
                     
+                except WebSocketDisconnect:
+                    # Client disconnected during operation
+                    break
                 except Exception as e:
                     logger.error(f"Error fetching request status: {e}", exc_info=True)
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": str(e)
-                    })
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": str(e)
+                        })
+                    except (WebSocketDisconnect, RuntimeError):
+                        # Client disconnected, can't send error message
+                        pass
                     break
                 
     except WebSocketDisconnect:

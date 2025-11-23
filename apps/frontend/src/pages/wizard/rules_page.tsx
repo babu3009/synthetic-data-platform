@@ -5,6 +5,8 @@ import { useWizard } from '../../state/wizard'
 import type { Rule, ValidationReport } from '../../services/validation'
 import type { EntitySchema, Table as EntityTable, Column as EntityColumn } from '../../state/wizard'
 import { validateRules } from '../../services/validation'
+import { updateEntity } from '../../services/entities'
+import RulesBuilder from '../../components/rules_builder'
 
 function prettyJSON(obj: unknown) {
   try {
@@ -60,8 +62,9 @@ function toNormalizedRules(obj: unknown): Rule[] | string {
 }
 
 export default function RulesPage() {
-  const { state } = useWizard()
-  const entity: EntitySchema | undefined = state.entities.find((e) => e.id === state.selectedEntityId) || state.entities[0]
+  const { state, dispatch } = useWizard()
+  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>(state.selectedEntityId)
+  const entity: EntitySchema | undefined = state.entities.find((e) => e.id === selectedEntityId) || state.entities[0]
 
   const [source, setSource] = useState<'yaml' | 'json'>('yaml')
   const [yamlText, setYamlText] = useState<string>(() => {
@@ -73,6 +76,49 @@ export default function RulesPage() {
   const [parseError, setParseError] = useState<string | null>(null)
   const [report, setReport] = useState<ValidationReport | null>(null)
   const [sending, setSending] = useState(false)
+  const [showBuilder, setShowBuilder] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Sync selectedEntityId with wizard state
+  useEffect(() => {
+    if (state.selectedEntityId && state.selectedEntityId !== selectedEntityId) {
+      setSelectedEntityId(state.selectedEntityId)
+    }
+  }, [state.selectedEntityId])
+
+  // Load rules from entity when entity changes
+  useEffect(() => {
+    if (!entity) return
+    
+    // Load saved rules from entity if they exist
+    if (entity.rulesConfig && entity.rulesConfig.trim()) {
+      const format = entity.rulesFormat || 'yaml'
+      setSource(format)
+      
+      if (format === 'yaml') {
+        setYamlText(entity.rulesConfig)
+      } else {
+        setJsonText(entity.rulesConfig)
+      }
+      return
+    }
+    
+    // Otherwise, auto-generate default rules
+    // Generate uniqueness rules for PKs
+    const autoRules: Rule[] = []
+    for (const table of entity.tables) {
+      if (table.pk && table.pk.length > 0) {
+        autoRules.push({
+          type: 'uniqueness',
+          table: table.name,
+          columns: table.pk
+        })
+      }
+    }
+    
+    const rulesObj = { rules: autoRules }
+    setYamlText(YAML.dump(rulesObj))
+  }, [entity?.id, entity?.rulesConfig, entity?.rulesFormat])
 
   // Mirror other pane
   useEffect(() => {
@@ -141,23 +187,137 @@ export default function RulesPage() {
   }, [rules, entity])
 
   async function onDryRunValidate() {
+    if (!entity) return
     setSending(true)
     setReport(null)
     try {
-      const payload: { rules: Rule[] | null } = { rules }
+      // Build payload with entity schema for data generation
+      const payload: {
+        rules: Rule[] | null
+        entity?: {
+          name: string
+          tables: Array<{
+            name: string
+            columns: Array<{
+              name: string
+              dtype: string
+              provider?: string
+              providerConfig?: Record<string, unknown>
+            }>
+          }>
+        }
+        sample_rows?: number
+      } = {
+        rules,
+        entity: {
+          name: entity.name,
+          tables: entity.tables.map(t => ({
+            name: t.name,
+            columns: t.columns.map(c => ({
+              name: c.name,
+              dtype: c.dtype,
+              provider: c.provider,
+              providerConfig: c.providerConfig
+            }))
+          }))
+        },
+        sample_rows: 100  // Generate 100 sample rows for validation
+      }
+      
       const res = await validateRules(payload)
       setReport(res.report || null)
     } catch (e) {
       // Shallow error surface
+      const msg = e instanceof Error ? e.message : 'Validation failed'
       setReport({ sample: [], final: [] })
+      setError(msg)
     } finally {
       setSending(false)
     }
   }
 
+  async function handleSaveRules() {
+    if (!entity || !rules || !state.projectId) return
+    
+    const rulesConfig = source === 'yaml' ? yamlText : jsonText
+    const rulesFormat = source
+    
+    try {
+      // Save to backend via API
+      await updateEntity(state.projectId, entity.id, {
+        rules_config: rulesConfig,
+        rules_format: rulesFormat
+      })
+      
+      // Update local state
+      dispatch({
+        type: 'updateEntity',
+        id: entity.id,
+        patch: {
+          rulesConfig,
+          rulesFormat
+        }
+      })
+      
+      setError(null)
+      // Show success feedback
+      const successMsg = document.createElement('div')
+      successMsg.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3'
+      successMsg.style.zIndex = '9999'
+      successMsg.textContent = '✓ Rules saved to database'
+      document.body.appendChild(successMsg)
+      setTimeout(() => successMsg.remove(), 2000)
+    } catch (err: any) {
+      console.error('Failed to save rules:', err)
+      setError(`Failed to save rules: ${err.message || 'Unknown error'}`)
+    }
+  }
+
+  function handleAddRule(rule: Rule) {
+    // Add rule to the current rules array
+    const currentRules = rules || []
+    const newRules = [...currentRules, rule]
+    
+    // Update the YAML/JSON text
+    const rulesObj = { rules: newRules }
+    if (source === 'yaml') {
+      setYamlText(YAML.dump(rulesObj))
+    } else {
+      setJsonText(prettyJSON(rulesObj))
+    }
+    
+    setShowBuilder(false)
+  }
+
   return (
     <div>
       {!entity && <Alert variant="info">Select or create an entity first.</Alert>}
+
+      {state.entities.length > 0 && (
+        <div className="mb-3">
+          <Form.Group as={Row} className="align-items-center">
+            <Form.Label column sm={2} className="fw-bold">
+              Entity:
+            </Form.Label>
+            <Col sm={10}>
+              <Form.Select
+                value={selectedEntityId || ''}
+                onChange={(e) => {
+                  setSelectedEntityId(e.target.value)
+                  dispatch({ type: 'setSelectedEntity', id: e.target.value })
+                }}
+                style={{ width: 'auto', maxWidth: '400px' }}
+              >
+                {state.entities.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} {e.version ? `(v${e.version})` : ''}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+          </Form.Group>
+        </div>
+      )}
 
       <div className="d-flex justify-content-between align-items-center mb-2">
         <div className="d-flex align-items-center gap-2">
@@ -168,6 +328,23 @@ export default function RulesPage() {
           </ToggleButtonGroup>
         </div>
         <div className="d-flex align-items-center gap-2">
+          <Button 
+            variant="success" 
+            size="sm" 
+            onClick={() => setShowBuilder(true)}
+            aria-label="Open guided rule builder"
+          >
+            <i className="bi bi-plus-circle"></i> Add Rule (Guided)
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSaveRules}
+            disabled={!rules || !entity || parseError !== null}
+            aria-label="Save rules to entity"
+          >
+            💾 Save Rules
+          </Button>
           <OverlayTrigger placement="left" overlay={<Tooltip>Run a server-side check without saving rules</Tooltip>}>
             <Button onClick={onDryRunValidate} disabled={sending || !rules || parseError!==null} aria-label="Dry-run validate rules"> {sending ? 'Validating…' : 'Dry-run validate'} </Button>
           </OverlayTrigger>
@@ -215,6 +392,16 @@ export default function RulesPage() {
             </Col>
           </Row>
         </div>
+      )}
+      
+      {entity && (
+        <RulesBuilder
+          show={showBuilder}
+          onHide={() => setShowBuilder(false)}
+          entity={entity}
+          existingRules={rules || []}
+          onSave={handleAddRule}
+        />
       )}
     </div>
   )

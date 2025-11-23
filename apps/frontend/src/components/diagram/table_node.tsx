@@ -89,8 +89,13 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
                   size="sm"
                   type="number"
                   step="0.01"
+                  min="0"
                   value={rowTarget.ratio}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => data.onRowTargetChange({ type: 'ratioTo', table: rowTarget.table, ratio: Number(e.target.value) })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const val = e.target.value === '' ? 0 : Number(e.target.value);
+                    data.onRowTargetChange({ type: 'ratioTo', table: rowTarget.table, ratio: val });
+                  }}
+                  onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
                 />
               </>
             ) : (
@@ -98,8 +103,14 @@ export default memo(function TableNode({ data }: NodeProps<Data>) {
                 aria-label="Absolute row count"
                 size="sm"
                 type="number"
+                min="1"
+                step="1"
                 value={rowTarget && rowTarget.type === 'absolute' ? rowTarget.value : 1000}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => data.onRowTargetChange({ type: 'absolute', value: Number(e.target.value) })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const val = e.target.value === '' ? 1 : Number(e.target.value);
+                  data.onRowTargetChange({ type: 'absolute', value: val });
+                }}
+                onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
               />
             )}
           </InputGroup>

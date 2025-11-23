@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, lazy, Suspense } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect, type ChangeEvent, lazy, Suspense } from 'react'
 import ReactFlow, {
   addEdge,
   Background,
@@ -45,7 +45,7 @@ function compatible(a: string, b: string) {
 
 export default function DiagramCanvas(_: DiagramProps) {
   const { state, dispatch } = useWizard()
-  const entity = useMemo(() => state.entities.find((e: EntitySchema) => e.id === state.selectedEntityId) || state.entities[0], [state])
+  const entity = useMemo(() => state.entities.find((e: EntitySchema) => e.id === state.selectedEntityId) || state.entities[0], [state.entities, state.selectedEntityId])
   const entityId = entity?.id
 
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null)
@@ -82,16 +82,16 @@ export default function DiagramCanvas(_: DiagramProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(nodesInit)
   const [edges, setEdges, onEdgesChange] = useEdgesState(edgesInit)
 
-  // Synchronize when entity changes
-  const lastEntityId = useRef<string | undefined>(undefined)
-  const lastEntityUpdate = useRef<string | undefined>(undefined)
+  // Synchronize when entity ID changes (not on every render)
+  const lastEntityIdRef = useRef<string | undefined>(undefined)
   
-  if (entityId && (lastEntityId.current !== entityId || lastEntityUpdate.current !== entity?.updatedAt)) {
-    setNodes(nodesInit)
-    setEdges(edgesInit)
-    lastEntityId.current = entityId
-    lastEntityUpdate.current = entity?.updatedAt
-  }
+  useEffect(() => {
+    if (entity?.id && entity.id !== lastEntityIdRef.current) {
+      setNodes(nodesInit)
+      setEdges(edgesInit)
+      lastEntityIdRef.current = entity.id
+    }
+  }, [entity?.id])
 
   const onConnect: OnConnect = useCallback(
     (conn: Connection) => {
@@ -177,14 +177,6 @@ export default function DiagramCanvas(_: DiagramProps) {
     setSelectedRelId(null)
   }
 
-  // Left sidebar controls
-  const [selectedId, setSelectedId] = useState(entity?.id)
-
-  const onEntitySelect = (id: string) => {
-    setSelectedId(id)
-    dispatch({ type: 'setSelectedEntity', id })
-  }
-
   // Debounced autosave when entity changes (800ms)
   useAutosave([entity, state.projectId], async () => {
     if (!entity) return
@@ -194,15 +186,6 @@ export default function DiagramCanvas(_: DiagramProps) {
   return (
     <div className="position-relative diagram-container">
       <Row className="g-2 mb-2">
-        <Col md="auto">
-          <Form.Select aria-label="Select entity" value={selectedId} onChange={(e: ChangeEvent<HTMLSelectElement>) => onEntitySelect(e.target.value)} className="focus-ring">
-            {state.entities.map((e: EntitySchema) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </Form.Select>
-        </Col>
         <Col md="auto">
           <Button variant="outline-secondary" onClick={onAutoLayout} aria-label="Auto layout tables" className="focus-ring">
             Auto Layout

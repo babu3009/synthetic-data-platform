@@ -26,13 +26,19 @@ class EntityCreate(BaseModel):
     """Create entity request."""
     id: str | None = Field(None, description="Optional UUID for entity. If not provided, one will be generated.")
     name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = Field(None, description="Optional description of the entity")
     schema: EntitySchema
+    rules_config: str | None = Field(None, description="YAML or JSON rules configuration")
+    rules_format: str | None = Field(None, description="Format of rules_config: 'yaml' or 'json'")
 
 
 class EntityUpdate(BaseModel):
     """Update entity request."""
     name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = Field(None, description="Optional description of the entity")
     schema: EntitySchema | None = None
+    rules_config: str | None = Field(None, description="YAML or JSON rules configuration")
+    rules_format: str | None = Field(None, description="Format of rules_config: 'yaml' or 'json'")
 
 
 class EntityResponse(BaseModel):
@@ -40,7 +46,11 @@ class EntityResponse(BaseModel):
     id: str
     project_id: str
     name: str
+    description: str | None = None
+    version: int
     schema: dict
+    rules_config: str | None = None
+    rules_format: str | None = None
     created_at: str
     updated_at: str
 
@@ -66,7 +76,10 @@ async def create_entity(
     entity_kwargs = {
         "project_id": project_id,
         "name": entity.name,
+        "description": entity.description,
         "schema_json": entity.schema.model_dump(),
+        "rules_config": entity.rules_config,
+        "rules_format": entity.rules_format,
     }
     # Use provided ID if valid UUID string, otherwise let DB generate
     if entity.id:
@@ -84,13 +97,17 @@ async def create_entity(
         id=str(db_entity.id),
         project_id=str(db_entity.project_id),
         name=db_entity.name,
+        description=db_entity.description,
+        version=db_entity.version,
         schema=db_entity.schema_json,
+        rules_config=db_entity.rules_config,
+        rules_format=db_entity.rules_format,
         created_at=db_entity.created_at.isoformat(),
         updated_at=db_entity.updated_at.isoformat(),
     )
 
 
-@router.get("", response_model=List[EntityResponse])
+@router.get("", response_model=list[EntityResponse])
 async def list_entities(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -109,7 +126,11 @@ async def list_entities(
             id=str(e.id),
             project_id=str(e.project_id),
             name=e.name,
+            description=e.description,
+            version=e.version,
             schema=e.schema_json,
+            rules_config=e.rules_config,
+            rules_format=e.rules_format,
             created_at=e.created_at.isoformat(),
             updated_at=e.updated_at.isoformat(),
         )
@@ -164,8 +185,17 @@ async def update_entity(
     
     if update.name is not None:
         entity.name = update.name
+    if update.description is not None:
+        entity.description = update.description
     if update.schema is not None:
         entity.schema_json = update.schema.model_dump()
+    if update.rules_config is not None:
+        entity.rules_config = update.rules_config
+    if update.rules_format is not None:
+        entity.rules_format = update.rules_format
+    
+    # Increment version on any update
+    entity.version += 1
     
     await db.commit()
     await db.refresh(entity)
@@ -174,13 +204,19 @@ async def update_entity(
         id=str(entity.id),
         project_id=str(entity.project_id),
         name=entity.name,
+        description=entity.description,
+        version=entity.version,
         schema=entity.schema_json,
+        rules_config=entity.rules_config,
+        rules_format=entity.rules_format,
         created_at=entity.created_at.isoformat(),
         updated_at=entity.updated_at.isoformat(),
     )
 
 
-@router.delete("/{entity_id}", status_code=204)
+@router.delete("/{entity_id}")
+@router.put("/{entity_id}", response_model=EntityResponse)
+@router.put("/{entity_id}", response_model=EntityResponse)
 async def delete_entity(
     project_id: UUID,
     entity_id: UUID,

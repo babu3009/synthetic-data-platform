@@ -185,38 +185,38 @@ def _heuristic_suggest(col: ColumnSpec) -> Optional[Dict[str, Any]]:
 
     # PII and common tokens
     if _EMAIL_PAT.search(hay):
-        set_cfg("email", prov="email", conf=0.98, reason="column looks like email", pii_tag="contact.email")
+        set_cfg({"type": "faker", "method": "email"}, prov="faker", conf=0.98, reason="column looks like email", pii_tag="contact.email")
     elif _PHONE_PAT.search(hay):
-        set_cfg("phone", prov="phone", conf=0.9, reason="column looks like phone", pii_tag="contact.phone")
+        set_cfg({"type": "faker", "method": "phone_number"}, prov="faker", conf=0.9, reason="column looks like phone", pii_tag="contact.phone")
     elif _NAME_FIRST_PAT.search(hay):
-        set_cfg("first_name", prov="first_name", conf=0.9, reason="first name detected", pii_tag="person.first_name")
+        set_cfg({"type": "faker", "method": "first_name"}, prov="faker", conf=0.9, reason="first name detected", pii_tag="person.first_name")
     elif _NAME_LAST_PAT.search(hay):
-        set_cfg("last_name", prov="last_name", conf=0.9, reason="last name detected", pii_tag="person.last_name")
+        set_cfg({"type": "faker", "method": "last_name"}, prov="faker", conf=0.9, reason="last name detected", pii_tag="person.last_name")
     elif _NAME_FULL_PAT.search(hay):
-        set_cfg("name", prov="name", conf=0.75, reason="name-like column", pii_tag="person.name")
+        set_cfg({"type": "faker", "method": "name"}, prov="faker", conf=0.75, reason="name-like column", pii_tag="person.name")
     elif _ADDRESS_PAT.search(hay):
-        set_cfg("address", prov="address", conf=0.75, reason="address-like column", pii_tag="location.address")
+        set_cfg({"type": "faker", "method": "address"}, prov="faker", conf=0.75, reason="address-like column", pii_tag="location.address")
     elif _CITY_PAT.search(hay):
-        set_cfg("city", prov="city", conf=0.7, reason="city token" )
+        set_cfg({"type": "faker", "method": "city"}, prov="faker", conf=0.7, reason="city token" )
     elif _STATE_PAT.search(hay):
-        set_cfg("state", prov="state", conf=0.7, reason="state/province token")
+        set_cfg({"type": "faker", "method": "state"}, prov="faker", conf=0.7, reason="state/province token")
     elif _ZIP_PAT.search(hay):
-        set_cfg("postal_code", prov="postal_code", conf=0.7, reason="postal/zip token")
+        set_cfg({"type": "faker", "method": "postcode"}, prov="faker", conf=0.7, reason="postal/zip token")
     elif _COUNTRY_PAT.search(hay):
-        set_cfg("country", prov="country", conf=0.7, reason="country token")
+        set_cfg({"type": "faker", "method": "country"}, prov="faker", conf=0.7, reason="country token")
     elif _UUID_PAT.search(hay):
         set_cfg({"type": "uuid4"}, prov="uuid4", conf=0.85, reason="uuid token")
     elif _ID_PAT.search(hay) and ("int" in dtype or dtype in {"bigint", "integer", "number"}):
         set_cfg({"type": "sequence", "start": 1}, prov="sequence", conf=0.75, reason="id integer implies sequence")
     elif _IBAN_PAT.search(hay):
         # Not exact, but a checksum provider is a reasonable starting point
-        set_cfg({"type": "checksum", "length": 22}, prov="iban-like", conf=0.6, reason="iban token (use checksum)" )
+        set_cfg({"type": "checksum", "length": 22}, prov="checksum", conf=0.6, reason="iban token (use checksum)" )
     elif _CARD_PAT.search(hay):
-        set_cfg({"type": "checksum", "length": 16}, prov="luhn", conf=0.65, reason="card token (luhn-like)" )
+        set_cfg({"type": "checksum", "length": 16}, prov="checksum", conf=0.65, reason="card token (luhn-like)" )
     elif _IP_PAT.search(hay):
-        set_cfg("ipv4", prov="ipv4", conf=0.7, reason="ip token")
+        set_cfg({"type": "faker", "method": "ipv4"}, prov="faker", conf=0.7, reason="ip token")
     elif _URL_PAT.search(hay):
-        set_cfg("url", prov="url", conf=0.7, reason="url token")
+        set_cfg({"type": "faker", "method": "url"}, prov="faker", conf=0.7, reason="url token")
     elif _DATE_PAT.search(hay) or ("date" in dtype or "time" in dtype):
         set_cfg({"type": "date_range", "start": "2018-01-01", "end": "2025-01-01"}, prov="date_range", conf=0.8, reason="date-like column")
     elif _AMOUNT_PAT.search(hay) or ("decimal" in dtype or "numeric" in dtype or "float" in dtype):

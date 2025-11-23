@@ -48,18 +48,57 @@ export default function RequestDetailPage() {
       return
     }
     setStarting(true)
+    setError(null)
+    
     try {
+      // Start the request - this may timeout but job will continue
       await startRequest(projectId, requestId)
-      // Refresh the request data
+      
+      // If we get here, request started successfully
+      console.log('Start request completed successfully')
+      
+      // Refresh the request data to get initial state
       const updated = await getRequest(projectId, requestId)
       setReq(updated)
+      
+      // Set initial progress if available
+      if (updated.params_json && typeof updated.params_json.progress === 'number') {
+        setProgress(updated.params_json.progress)
+      }
     } catch (e: unknown) {
-      const err = e as Error
-      // Handle validation errors from API
-      if (err.message && typeof err.message === 'object') {
-        setError(JSON.stringify(err.message, null, 2))
+      const err = e as any
+      
+      // Check if this is a timeout error
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        console.log('Start request timed out, but job may still be running')
+        
+        // Don't show error - WebSocket will provide updates
+        // Try to fetch current state
+        try {
+          const updated = await getRequest(projectId, requestId)
+          setReq(updated)
+          
+          if (updated.status !== 'pending') {
+            // Job has started, WebSocket will handle updates
+            console.log('Job is running, WebSocket will provide updates')
+          } else {
+            // Job hasn't started, show error
+            setError('Request timeout - job may still be starting. Use Refresh button to check status.')
+          }
+        } catch (fetchErr) {
+          setError('Request timeout. Click Refresh to check job status.')
+        }
       } else {
-        setError(err.message || 'Failed to start request')
+        // Handle other errors (validation, etc.)
+        if (err.response?.data?.detail) {
+          setError(typeof err.response.data.detail === 'object' 
+            ? JSON.stringify(err.response.data.detail, null, 2)
+            : err.response.data.detail)
+        } else if (err.message && typeof err.message === 'object') {
+          setError(JSON.stringify(err.message, null, 2))
+        } else {
+          setError(err.message || 'Failed to start request')
+        }
       }
     } finally {
       setStarting(false)
@@ -418,7 +457,7 @@ export default function RequestDetailPage() {
           {req.status === 'running' && (
             <Alert variant="info" className="mt-2">
               <Spinner animation="border" size="sm" className="me-2" />
-              Request is currently running...
+              Job is running... Watch the progress bar for real-time updates. WebSocket connected.
             </Alert>
           )}
           {req.status === 'pending' && (

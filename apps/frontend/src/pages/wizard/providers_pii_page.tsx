@@ -2,8 +2,9 @@ import { useMemo, useState, useEffect } from 'react'
 import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip, Popover } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
 import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
-import { autosaveEntity } from '../../services/entities'
+import { autosaveEntity, updateEntity } from '../../services/entities'
 import { useAutosave } from '../../hooks/use_autosave'
+import ProviderConfigBuilder from '../../components/provider_config_builder'
 
 function validateConfig(provider: Column['provider'], cfg: Column['providerConfig']): string | null {
   if (!provider) return null
@@ -140,7 +141,8 @@ function SuggestionsDiffModal({
 
 export default function ProvidersPiiPage() {
   const { state, dispatch } = useWizard()
-  const entity = state.entities.find((e) => e.id === state.selectedEntityId) || state.entities[0]
+  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>(state.selectedEntityId)
+  const entity = state.entities.find((e) => e.id === selectedEntityId) || state.entities[0]
   const [tableFilter, setTableFilter] = useState<string>('__all__')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -153,8 +155,23 @@ export default function ProvidersPiiPage() {
   const [suggestionsByKey, setSuggestionsByKey] = useState<Record<string, ProviderSuggestion>>({})
   const [summaryCounts, setSummaryCounts] = useState<{ providers: number; pii: number } | null>(null)
   const [autoSuggestedFor, setAutoSuggestedFor] = useState<string | null>(null)
+  
+  // Config builder state
+  const [showConfigBuilder, setShowConfigBuilder] = useState(false)
+  const [configBuilderContext, setConfigBuilderContext] = useState<{
+    tableName: string
+    column: Column
+    provider: NonNullable<Column['provider']>
+  } | null>(null)
 
   const projectId = state.projectId || 'default'
+
+  // Sync local selectedEntityId with wizard state
+  useEffect(() => {
+    if (state.selectedEntityId && state.selectedEntityId !== selectedEntityId) {
+      setSelectedEntityId(state.selectedEntityId)
+    }
+  }, [state.selectedEntityId, selectedEntityId])
 
   const tables = useMemo(() => entity?.tables || [], [entity])
   
@@ -216,6 +233,17 @@ export default function ProvidersPiiPage() {
     
     return () => clearTimeout(timer)
   }, [entity?.id, hasConfiguredProviders, autoSuggestedFor, loadingSuggest])
+  
+  const groupedByTable = useMemo(() => {
+    const groups: Record<string, Column[]> = {}
+    if (!entity) return groups
+    for (const t of entity.tables) {
+      if (tableFilter !== '__all__' && t.name !== tableFilter) continue
+      groups[t.name] = t.columns
+    }
+    return groups
+  }, [entity, tableFilter])
+
   const visibleRows = useMemo(() => {
     const rows: Array<{ table: string; column: Column }> = []
     if (!entity) return rows
@@ -252,6 +280,31 @@ export default function ProvidersPiiPage() {
 
   function handleProviderChange(table: string, col: Column, provider: Column['provider']) {
     dispatch({ type: 'updateColumn', entityId: entity.id, tableName: table, columnName: col.name, patch: { provider } })
+    
+    // Auto-open config builder for providers that require configuration
+    if (provider && ['pattern', 'categorical', 'expression', 'reference'].includes(provider)) {
+      setConfigBuilderContext({ tableName: table, column: col, provider })
+      setShowConfigBuilder(true)
+    }
+  }
+  
+  function openConfigBuilder(table: string, col: Column) {
+    if (!col.provider) return
+    setConfigBuilderContext({ tableName: table, column: col, provider: col.provider })
+    setShowConfigBuilder(true)
+  }
+  
+  function handleConfigBuilderSave(config: Record<string, unknown>) {
+    if (!configBuilderContext) return
+    dispatch({
+      type: 'updateColumn',
+      entityId: entity.id,
+      tableName: configBuilderContext.tableName,
+      columnName: configBuilderContext.column.name,
+      patch: { providerConfig: config }
+    })
+    setShowConfigBuilder(false)
+    setConfigBuilderContext(null)
   }
 
   function handleConfigChange(table: string, col: Column, value: string) {
@@ -389,34 +442,45 @@ export default function ProvidersPiiPage() {
   }
 
   async function handleSave() {
-    if (!entity) return
+    if (!entity || !projectId) return
     setSaving(true)
     setError(null)
     try {
-      // Persist entity snapshot (autosave) and try backend providers save
-      await autosaveEntity(projectId, entity)
-      // Build providers snapshot
-      const providers: ProviderSuggestion[] = []
-      for (const t of entity.tables) {
-        for (const c of t.columns) {
-          providers.push({
-            table: t.name,
-            column: c.name,
-            provider: c.provider,
-            providerConfig: c.providerConfig,
-            pii: c.pii,
-            piiSubtype: c.piiSubtype,
-          })
-        }
+      // Save entity schema to database (includes all provider configurations)
+      const schema = {
+        tables: entity.tables || [],
+        relationships: entity.relationships,
+        layout: entity.layout
       }
-      await saveProviders(projectId, entity.id, providers)
-      // Clear dirty on successful explicit save
+      
+      await updateEntity(projectId, entity.id, { schema })
+      
+      // Update local state to mark as saved
+      dispatch({ 
+        type: 'updateEntity', 
+        id: entity.id, 
+        patch: { 
+          tables: entity.tables,
+          relationships: entity.relationships,
+          layout: entity.layout
+        } 
+      })
+      
+      // Clear dirty flag
       dispatch({ type: 'clearDirty' })
+      
+      // Show success feedback
+      const successMsg = document.createElement('div')
+      successMsg.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3'
+      successMsg.style.zIndex = '9999'
+      successMsg.textContent = '✓ Provider and PII settings saved to database'
+      document.body.appendChild(successMsg)
+      setTimeout(() => successMsg.remove(), 2000)
     } catch (e: unknown) {
-      // Show non-blocking error; localStorage fallback already attempted in service
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       const msg = e instanceof Error ? e.message : undefined
-      setError(detail || msg || 'Saved locally; backend save not available')
+      setError(detail || msg || 'Failed to save provider settings')
+      console.error('Failed to save providers:', e)
     } finally {
       setSaving(false)
     }
@@ -457,8 +521,27 @@ export default function ProvidersPiiPage() {
       <div className="d-flex justify-content-between align-items-center mb-2">
         <div className="d-flex align-items-center gap-2">
           <strong>Entity:</strong>
-          <span>{entity.name}</span>
-          {!hasConfiguredProviders && autoSuggestedFor === entity.id && (
+          <Form.Select 
+            size="sm" 
+            value={selectedEntityId || ''} 
+            onChange={(e) => {
+              const newId = e.target.value
+              setSelectedEntityId(newId)
+              dispatch({ type: 'setSelectedEntity', id: newId })
+            }}
+            style={{ width: 'auto', maxWidth: '300px' }}
+            aria-label="Select entity"
+          >
+            {state.entities.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name} {e.version ? `(v${e.version})` : ''}
+              </option>
+            ))}
+          </Form.Select>
+          <span className="badge bg-info text-dark">
+            <i className="bi bi-funnel"></i> Entity-specific filtering
+          </span>
+          {!hasConfiguredProviders && autoSuggestedFor === entity?.id && (
             <Alert variant="info" className="mb-0 py-1 px-2 small d-inline-block">
               <i className="bi bi-magic"></i> Auto-suggesting best providers...
             </Alert>
@@ -496,7 +579,6 @@ export default function ProvidersPiiPage() {
       <Table bordered hover size="sm">
         <thead>
           <tr>
-            <th>Table</th>
             <th>Column</th>
             <th>Type</th>
             <th>
@@ -527,21 +609,31 @@ export default function ProvidersPiiPage() {
           </tr>
         </thead>
         <tbody>
-          {visibleRows.length === 0 ? (
+          {Object.keys(groupedByTable).length === 0 ? (
             <tr>
               <td colSpan={6} className="text-center text-muted">
                 No columns
               </td>
             </tr>
           ) : (
-            visibleRows.map(({ table, column }, idx) => {
-              const cfgText = column.providerConfig ? JSON.stringify(column.providerConfig, null, 0) : ''
-              const validation = validateConfig(column.provider, column.providerConfig)
-              return (
-                <tr key={`${table}.${column.name}.${idx}`}>
-                  <td>{table}</td>
-                  <td>{column.name}</td>
-                  <td>{column.dtype}</td>
+            Object.entries(groupedByTable).flatMap(([tableName, columns]) => [
+              // Table header row
+              <tr key={`header-${tableName}`} className="table-active">
+                <td colSpan={6} className="fw-bold py-2 bg-light">
+                  {tableName}
+                </td>
+              </tr>,
+              // Column rows for this table
+              // Column rows for this table
+              ...columns.map((column, colIdx) => {
+                const table = tableName
+                const idx = visibleRows.findIndex(r => r.table === table && r.column.name === column.name)
+                const cfgText = column.providerConfig ? JSON.stringify(column.providerConfig, null, 0) : ''
+                const validation = validateConfig(column.provider, column.providerConfig)
+                return (
+                  <tr key={`${table}.${column.name}.${colIdx}`}>
+                    <td className="ps-4">{column.name}</td>
+                    <td>{column.dtype}</td>
                   <td>
                     <Form.Select
                       aria-label={`Provider for ${table}.${column.name}`}
@@ -569,28 +661,42 @@ export default function ProvidersPiiPage() {
                     </Form.Select>
                   </td>
                   <td>
-                    <Form.Control
-                      as="textarea"
-                      rows={1}
-                      aria-label={`Provider config for ${table}.${column.name}`}
-                      value={cfgText}
-                      onChange={(e) => handleConfigChange(table, column, e.target.value)}
-                      placeholder={column.provider === 'pattern' ? '{"mask":"AA-9999"}' : column.provider === 'categorical' ? '{"categories":[{"value":"A","weight":0.5}]}' : '{}'}
-                      isInvalid={!!validation}
-                      onKeyDown={(e) => {
-                        if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-                          e.preventDefault()
-                          const dir = e.key === 'ArrowDown' ? 1 : -1
-                          const nextIndex = idx + dir
-                          const selector = `[data-row-index="${nextIndex}"][data-col-role="config"]`
-                          const el = document.querySelector<HTMLTextAreaElement>(selector)
-                          el?.focus()
-                        }
-                      }}
-                      data-row-index={idx}
-                      data-col-role="config"
-                    />
-                    {validation && <Form.Control.Feedback type="invalid">{validation}</Form.Control.Feedback>}
+                    <div className="d-flex gap-1 align-items-start">
+                      <Form.Control
+                        as="textarea"
+                        rows={1}
+                        aria-label={`Provider config for ${table}.${column.name}`}
+                        value={cfgText}
+                        onChange={(e) => handleConfigChange(table, column, e.target.value)}
+                        placeholder={column.provider === 'pattern' ? '{"mask":"AA-9999"}' : column.provider === 'categorical' ? '{"categories":[{"value":"A","weight":0.5}]}' : '{}'}
+                        isInvalid={!!validation}
+                        onKeyDown={(e) => {
+                          if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                            e.preventDefault()
+                            const dir = e.key === 'ArrowDown' ? 1 : -1
+                            const nextIndex = idx + dir
+                            const selector = `[data-row-index="${nextIndex}"][data-col-role="config"]`
+                            const el = document.querySelector<HTMLTextAreaElement>(selector)
+                            el?.focus()
+                          }
+                        }}
+                        data-row-index={idx}
+                        data-col-role="config"
+                        className="flex-grow-1"
+                      />
+                      {column.provider && (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => openConfigBuilder(table, column)}
+                          title="Open guided config builder"
+                          aria-label={`Configure ${column.provider} provider for ${table}.${column.name}`}
+                        >
+                          <i className="bi bi-gear-fill"></i>
+                        </Button>
+                      )}
+                    </div>
+                    {validation && <Form.Control.Feedback type="invalid" className="d-block">{validation}</Form.Control.Feedback>}
                   </td>
                   <td>
                     <Row className="g-1">
@@ -695,6 +801,7 @@ export default function ProvidersPiiPage() {
                 </tr>
               )
             })
+            ])
           )}
         </tbody>
       </Table>
@@ -705,6 +812,21 @@ export default function ProvidersPiiPage() {
         diffs={diffs}
         onConfirm={handleApplyDiffs}
       />
+      
+      {configBuilderContext && (
+        <ProviderConfigBuilder
+          show={showConfigBuilder}
+          onHide={() => {
+            setShowConfigBuilder(false)
+            setConfigBuilderContext(null)
+          }}
+          provider={configBuilderContext.provider}
+          currentConfig={configBuilderContext.column.providerConfig}
+          onSave={handleConfigBuilderSave}
+          columnName={configBuilderContext.column.name}
+          columnType={configBuilderContext.column.dtype}
+        />
+      )}
       </>
       )}
     </div>

@@ -36,10 +36,14 @@ export type Table = {
 export type EntitySchema = {
   id: string
   name: string
+  description?: string
+  version?: number
   tables: Table[]
   updatedAt: string // ISO string
   relationships?: Relationship[]
   layout?: Record<string, { x: number; y: number }>
+  rulesConfig?: string  // YAML or JSON text of rules
+  rulesFormat?: 'yaml' | 'json'  // Format of rulesConfig
 }
 
 export type Relationship = {
@@ -224,29 +228,53 @@ function WizardProviderImpl({ children, initialProjectId }: { children: React.Re
     isDirty: false,
   })
 
-  // Draft rehydration: load any autosaved entities for the project
+  // Draft rehydration: load entities from backend, fallback to localStorage
   useEffect(() => {
     if (!state.projectId) return
-    try {
-      const prefix = `autosave:${state.projectId || 'default'}:`
-      const keys = Object.keys(localStorage)
-      const drafts = keys.filter((k) => k.startsWith(prefix))
-      if (drafts.length === 0) return
-      drafts.forEach((k) => {
-        try {
-          const raw = localStorage.getItem(k)
-          if (!raw) return
-          const entity = JSON.parse(raw) as EntitySchema
+    
+    // First try to load from backend
+    const loadFromBackend = async () => {
+      try {
+        const { listEntities } = await import('../services/entities')
+        const entities = await listEntities(state.projectId!)
+        
+        // Add entities from backend that aren't already in state
+        entities.forEach((entity) => {
           if (!state.entities.some((e) => e.id === entity.id)) {
             dispatch({ type: 'addEntity', entity })
+          } else {
+            // Entity exists in state, update it with backend data (backend is source of truth)
+            dispatch({ type: 'updateEntity', id: entity.id, patch: entity })
           }
+        })
+      } catch (error) {
+        console.warn('Failed to load entities from backend, falling back to localStorage:', error)
+        
+        // Fallback to localStorage if backend fails
+        try {
+          const prefix = `autosave:${state.projectId || 'default'}:`
+          const keys = Object.keys(localStorage)
+          const drafts = keys.filter((k) => k.startsWith(prefix))
+          if (drafts.length === 0) return
+          drafts.forEach((k) => {
+            try {
+              const raw = localStorage.getItem(k)
+              if (!raw) return
+              const entity = JSON.parse(raw) as EntitySchema
+              if (!state.entities.some((e) => e.id === entity.id)) {
+                dispatch({ type: 'addEntity', entity })
+              }
+            } catch (_) {
+              // ignore malformed
+            }
+          })
         } catch (_) {
-          // ignore malformed
+          // ignore
         }
-      })
-    } catch (_) {
-      // ignore
+      }
     }
+    
+    loadFromBackend()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.projectId])
 

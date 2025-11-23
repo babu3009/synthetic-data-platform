@@ -22,9 +22,36 @@ export type ProviderSuggestion = {
 }
 
 export async function inferProviders(projectId: string, entity: EntitySchema, headers?: Record<string, string>) {
-  // Backend: try /api/v1 path; if it fails, propagate error
-  const res = await api.post(`/api/v1/projects/${projectId}/infer/providers`, { entity }, { headers })
-  return (res.data?.suggestions || []) as ProviderSuggestion[]
+  // Build columns from entity schema
+  const columns = entity.tables?.flatMap(table => 
+    table.columns.map(col => ({
+      table: table.name,
+      column: col.name,
+      dtype: col.dtype
+    }))
+  ) || []
+  
+  // Backend: try /api/v1 path with entity_id for filtering
+  const res = await api.post(
+    `/api/v1/projects/${projectId}/infer/providers`, 
+    { 
+      columns,
+      entity_id: entity.id 
+    }, 
+    { headers }
+  )
+  return (res.data?.results || []).flatMap((r: any) => 
+    r.suggestions?.map((s: any) => ({
+      table: r.table,
+      column: r.column,
+      provider: s.provider,
+      providerConfig: s.provider_config,
+      pii: s.pii?.flagged,
+      piiSubtype: s.pii?.subtype,
+      confidence: s.score,
+      reason: s.reasons?.join('; ')
+    })) || []
+  ) as ProviderSuggestion[]
 }
 
 // Optional non-scoped alias for public/trial mode

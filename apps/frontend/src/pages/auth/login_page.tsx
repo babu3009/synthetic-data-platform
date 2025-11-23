@@ -14,10 +14,21 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [ssoError, setSsoError] = useState<string | null>(null)
   const [ssoLoading, setSsoLoading] = useState(false)
+  const [ssoEnabled, setSsoEnabled] = useState(false)
 
   useEffect(() => {
     const prefill = searchParams.get('email')
     if (prefill) setEmail(prefill)
+    
+    // Check if SSO is enabled on mount
+    fetchOidcAuthorize()
+      .then(res => {
+        setSsoEnabled(res.enabled)
+      })
+      .catch(() => {
+        // If check fails, assume SSO is not available
+        setSsoEnabled(false)
+      })
   }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,9 +98,11 @@ const LoginPage: React.FC = () => {
         </div>
         {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
         <button type="submit" className="btn btn-primary me-2" disabled={loading}> {loading ? 'Logging in...' : 'Login'} </button>
-        <button type="button" className="btn btn-outline-secondary" onClick={handleSsoStart} disabled={ssoLoading} aria-label="Continue with SSO">
-          {ssoLoading ? 'Redirecting…' : 'Continue with SSO'}
-        </button>
+        {ssoEnabled && (
+          <button type="button" className="btn btn-outline-secondary" onClick={handleSsoStart} disabled={ssoLoading} aria-label="Continue with SSO">
+            {ssoLoading ? 'Redirecting…' : 'Continue with SSO'}
+          </button>
+        )}
         {ssoError && <div className="alert alert-warning py-2 mt-2" role="alert">{ssoError}</div>}
         <div className="mt-3">
           <a href="/forgot-password">Forgot password?</a>

@@ -97,6 +97,33 @@ async def infer_providers_for_project(
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded; try again later")
 
     cols = [ColumnSpec(table=c.table, column=c.column, dtype=c.dtype, description=c.description) for c in (payload.columns or [])]
+    
+    # Filter columns by entity_id if provided
+    if payload.entity_id:
+        try:
+            from app.db.models import WizardEntity
+            entity_uuid = UUID(payload.entity_id)
+            res = await db.execute(select(WizardEntity).where(
+                WizardEntity.id == entity_uuid,
+                WizardEntity.project_id == pid_uuid
+            ))
+            entity = res.scalar_one_or_none()
+            if entity:
+                # Get table and column names from entity schema
+                entity_tables = set()
+                entity_columns = set()
+                for table in entity.schema_json.get('tables', []):
+                    table_name = table.get('name')
+                    entity_tables.add(table_name)
+                    for col in table.get('columns', []):
+                        entity_columns.add((table_name, col.get('name')))
+                
+                # Filter cols to only those in this entity
+                cols = [c for c in cols if (c.table, c.column) in entity_columns]
+        except Exception:
+            # If entity lookup fails, continue with all columns
+            pass
+    
     llm_enabled = False
     llm_provider = None
     temperature = None

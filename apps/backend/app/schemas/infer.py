@@ -21,6 +21,7 @@ class LLMRequest(BaseModel):
 class InferProvidersRequest(BaseModel):
     columns: List[InferColumn] = Field(default_factory=list)
     llm: Optional[LLMRequest] = Field(default=None)
+    entity_id: Optional[str] = Field(default=None, description="Filter columns to specific entity")
 
 
 class ProviderSuggestion(BaseModel):

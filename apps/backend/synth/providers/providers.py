@@ -335,10 +335,21 @@ try:
     from faker import Faker
 
     class FakerProvider(UniqueMixin):
-        def __init__(self, method: str, locale: Optional[str] = None, unique: bool = False):
+        def __init__(
+            self, 
+            method: str, 
+            locale: Optional[str] = None, 
+            unique: bool = False,
+            min_age: Optional[int] = None,
+            max_age: Optional[int] = None,
+            **kwargs
+        ):
             self.method = method
             self.locale = locale
             self.unique = unique
+            self.min_age = min_age
+            self.max_age = max_age
+            self.kwargs = kwargs
             self._fk_cache: dict = {}
 
         def _get_faker(self, context: Context) -> Faker:
@@ -355,13 +366,28 @@ try:
 
         def _one(self, fk: Faker) -> Any:
             prov = getattr(fk, self.method)
+            
+            # Special handling for date_of_birth with age constraints
+            if self.method == 'date_of_birth' and (self.min_age is not None or self.max_age is not None):
+                min_age = self.min_age if self.min_age is not None else 0
+                max_age = self.max_age if self.max_age is not None else 100
+                return prov(minimum_age=min_age, maximum_age=max_age)
+            
+            # Check if method accepts parameters
+            if self.kwargs:
+                try:
+                    return prov(**self.kwargs)
+                except TypeError:
+                    # Method doesn't accept parameters, call without args
+                    return prov()
+            
             return prov()
 
         def sample(self, n: int, context: Context) -> Iterable[Any]:
             fk = self._get_faker(context)
             if self.unique:
                 fk_unique = fk.unique
-                vals = [getattr(fk_unique, self.method)() for _ in range(n)]
+                vals = [self._one(fk_unique) for _ in range(n)]
                 # faker.unique keeps internal registry; clear for next calls with different context
                 fk.unique.clear()
                 return vals

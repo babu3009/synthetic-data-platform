@@ -326,14 +326,155 @@ async def sign_artifact(db: AsyncSession, *, request_id: UUID, artifact_id: UUID
 
 def validate_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        rules_norm = parse_rules(payload)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Validation payload keys: {list(payload.keys())}")
+        
+        # Check if rules are already normalized (have 'type' field) or need DSL parsing
+        rules_input = payload.get("rules", [])
+        if rules_input and isinstance(rules_input, list) and len(rules_input) > 0:
+            first_rule = rules_input[0]
+            if isinstance(first_rule, dict) and "type" in first_rule:
+                # Already normalized - use directly
+                logger.info("Rules already normalized, using directly")
+                rules_norm = rules_input
+            else:
+                # Need to parse DSL format
+                logger.info("Parsing rules from DSL format")
+                rules_norm = parse_rules(payload)
+        else:
+            # Empty rules or need parsing
+            rules_norm = parse_rules(payload) if isinstance(rules_input, dict) or (isinstance(rules_input, list) and rules_input) else []
         data_sample = payload.get("data_sample", {})
         data_final = payload.get("data_final", {})
+        
+        # If no data provided but entity schema is given, generate sample data
+        if (not data_sample or not data_final) and "entity" in payload:
+            from synth.providers.registry import ProviderRegistry
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            logger.info("Generating sample data from entity schema")
+            entity = payload["entity"]
+            sample_rows = payload.get("sample_rows", 100)
+            logger.info(f"Entity name: {entity.get('name')}, Tables: {len(entity.get('tables', []))}, Rows: {sample_rows}")
+            
+            # Generate data for each table in the entity
+            generated_data: Dict[str, List[Dict[str, Any]]] = {}
+            
+            for table in entity.get("tables", []):
+                table_name = table["name"]
+                columns = table.get("columns", [])
+                logger.info(f"Generating data for table '{table_name}' with {len(columns)} columns")
+                
+                # Build column configs for data generation
+                col_configs = []
+                for col in columns:
+                    col_config = {
+                        "name": col["name"],
+                        "dtype": col.get("dtype", "string")
+                    }
+                    
+                    # Add provider configuration if present
+                    if col.get("provider"):
+                        col_config["provider"] = col["provider"]
+                        if col.get("providerConfig"):
+                            col_config["providerConfig"] = col["providerConfig"]
+                    
+                    col_configs.append(col_config)
+                
+                # Generate rows for this table
+                if col_configs:
+                    rows = []
+                    for i in range(sample_rows):
+                        row = {}
+                        for col_cfg in col_configs:
+                            col_name = col_cfg["name"]
+                            
+                            # Generate value based on provider or dtype
+                            if "provider" in col_cfg and col_cfg["provider"]:
+                                try:
+                                    # Build provider config
+                                    provider_config_data = col_cfg.get("providerConfig", {})
+                                    
+                                    # Handle case where providerConfig might be a JSON string
+                                    if isinstance(provider_config_data, str):
+                                        import json
+                                        provider_config_data = json.loads(provider_config_data) if provider_config_data.strip() else {}
+                                    
+                                    # If providerConfig already has 'type', use it as-is
+                                    # Otherwise, use the provider field as the type
+                                    if isinstance(provider_config_data, dict) and "type" in provider_config_data:
+                                        prov_config = provider_config_data
+                                    else:
+                                        prov_config = {
+                                            "type": col_cfg["provider"],
+                                            **provider_config_data
+                                        }
+                                    
+                                    # Skip providers that are incomplete (e.g., faker without method)
+                                    if prov_config.get("type") == "faker" and "method" not in prov_config:
+                                        logger.debug(f"Skipping incomplete faker provider for {table_name}.{col_name} (no method specified)")
+                                        row[col_name] = _default_value_for_dtype(col_cfg["dtype"], i)
+                                        continue
+                                    
+                                    logger.debug(f"Creating provider for {table_name}.{col_name}: {prov_config}")
+                                    provider = ProviderRegistry.from_config(prov_config)
+                                    # Generate single value
+                                    values = provider(1, {"seed": i, "table": table_name, "column": col_name})
+                                    row[col_name] = values[0] if values else None
+                                except Exception as prov_err:
+                                    # Fallback to simple value based on dtype
+                                    import traceback
+                                    logger.debug(f"Provider error for {table_name}.{col_name} (provider={col_cfg.get('provider')}): {str(prov_err)}")
+                                    logger.debug(f"Provider config was: {col_cfg.get('providerConfig')}")
+                                    logger.debug(traceback.format_exc())
+                                    row[col_name] = _default_value_for_dtype(col_cfg["dtype"], i)
+                            else:
+                                row[col_name] = _default_value_for_dtype(col_cfg["dtype"], i)
+                        
+                        rows.append(row)
+                    
+                    generated_data[table_name] = rows
+            
+            # Use generated data if original data not provided
+            if not data_sample:
+                data_sample = generated_data
+            if not data_final:
+                data_final = generated_data
+        
         max_violations = int(payload.get("max_violations", 10))
         report = validate_rules(rules_norm, data_sample, data_final, max_violations)
         return {"rules": rules_norm, "report": report}
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Validation error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=400, detail=f"Validation failed: {str(e)}")
+
+
+def _default_value_for_dtype(dtype: str, index: int) -> Any:
+    """Generate a simple default value based on data type."""
+    dtype_lower = dtype.lower()
+    if "int" in dtype_lower:
+        return index + 1
+    elif "float" in dtype_lower or "decimal" in dtype_lower or "numeric" in dtype_lower:
+        return float(index + 1) * 1.5
+    elif "bool" in dtype_lower:
+        return index % 2 == 0
+    elif "date" in dtype_lower:
+        from datetime import date, timedelta
+        return (date(2024, 1, 1) + timedelta(days=index)).isoformat()
+    elif "time" in dtype_lower:
+        from datetime import datetime, timedelta
+        return (datetime(2024, 1, 1) + timedelta(hours=index)).isoformat()
+    else:
+        return f"value_{index}"
 
 
 __all__ = [

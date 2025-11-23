@@ -450,9 +450,15 @@ class WizardEntity(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey(f"{SCHEMA_NAME}.projects.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    version = Column(Integer, nullable=False, default=1, server_default='1')
     
     # Entity schema: tables, columns, relationships, layout
     schema_json = Column(JSONB, nullable=False)
+    
+    # Rules configuration
+    rules_config = Column(Text, nullable=True)  # YAML or JSON text
+    rules_format = Column(String(10), nullable=True)  # 'yaml' or 'json'
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

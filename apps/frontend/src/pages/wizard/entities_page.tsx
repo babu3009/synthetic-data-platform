@@ -3,6 +3,7 @@ import { Button, Table, Alert, ButtonGroup, Spinner } from 'react-bootstrap'
 import { useWizard, isEntityNameUnique, EntitySchema } from '../../state/wizard'
 import AddEntityModal from '../../components/entities/add_entity_modal'
 import EditEntityModal from '../../components/entities/edit_entity_modal'
+import { deleteEntity } from '../../services/entities'
 
 export default function EntitiesPage() {
   const { state, dispatch } = useWizard()
@@ -36,13 +37,28 @@ export default function EntitiesPage() {
   }
 
   const onUpdated = (entity: EntitySchema) => {
-    dispatch({ type: 'updateEntity', id: entity.id, patch: { name: entity.name, tables: entity.tables } })
+    dispatch({ type: 'updateEntity', id: entity.id, patch: { name: entity.name, description: entity.description, tables: entity.tables } })
     setEditingEntity(null)
   }
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete entity "${name}"?`)) {
-      dispatch({ type: 'deleteEntity', id })
+      try {
+        // Delete from backend if projectId exists
+        if (state.projectId) {
+          await deleteEntity(state.projectId, id)
+        }
+        
+        // Delete from localStorage
+        const key = `autosave:${projectId}:${id}`
+        localStorage.removeItem(key)
+        
+        // Update wizard state
+        dispatch({ type: 'deleteEntity', id })
+      } catch (err) {
+        console.error('Failed to delete entity:', err)
+        setError(`Failed to delete entity: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
     }
   }
 
@@ -139,6 +155,8 @@ export default function EntitiesPage() {
         <thead>
           <tr>
             <th>Name</th>
+            <th>Description</th>
+            <th>Version</th>
             <th>Tables</th>
             <th>Updated</th>
             <th style={{ width: '150px' }}>Actions</th>
@@ -147,7 +165,7 @@ export default function EntitiesPage() {
         <tbody>
           {entities.length === 0 ? (
             <tr>
-              <td colSpan={4} className="text-center text-muted">
+              <td colSpan={6} className="text-center text-muted">
                 No entities yet. Click "Add Entity" to get started.
               </td>
             </tr>
@@ -155,6 +173,12 @@ export default function EntitiesPage() {
             entities.map((e: EntitySchema) => (
               <tr key={e.id}>
                 <td role="button" onClick={() => handleView(e.id)}>{e.name}</td>
+                <td role="button" onClick={() => handleView(e.id)}>
+                  <small className="text-muted">{e.description || '-'}</small>
+                </td>
+                <td role="button" onClick={() => handleView(e.id)}>
+                  <span className="badge bg-secondary">v{e.version || 1}</span>
+                </td>
                 <td role="button" onClick={() => handleView(e.id)}>{e.tables?.length ?? 0}</td>
                 <td role="button" onClick={() => handleView(e.id)}>{new Date(e.updatedAt).toLocaleString()}</td>
                 <td>

@@ -28,7 +28,7 @@ PII_CATALOG: Dict[str, Dict[str, Any]] = {
     "phone": {"type": "faker", "method": "phone_number"},
     "address": {"type": "faker", "method": "address"},
     "name": {"type": "faker", "method": "name"},
-    "dob": {"type": "date_range", "start": "1950-01-01", "end": "2010-12-31"},
+    "dob": {"type": "faker", "method": "date_of_birth", "min_age": 18, "max_age": 80},
     "national_id": {"type": "checksum", "length": 12},
     "credit_card": {"type": "faker", "method": "credit_card_number"},
     "iban": {"type": "faker", "method": "iban"},
@@ -88,7 +88,19 @@ class ProviderRegistry:
             if ptype == "faker":
                 if FakerProvider is None:
                     raise RuntimeError("Faker is not installed, cannot use faker provider")
-                return FakerProvider(method=cfg["method"], locale=cfg.get("locale"), unique=unique)
+                # Extract age parameters for date_of_birth
+                min_age = cfg.get("min_age")
+                max_age = cfg.get("max_age")
+                # Pass all other config as kwargs
+                extra_kwargs = {k: v for k, v in cfg.items() if k not in ("type", "method", "locale", "unique", "min_age", "max_age")}
+                return FakerProvider(
+                    method=cfg["method"], 
+                    locale=cfg.get("locale"), 
+                    unique=unique,
+                    min_age=min_age,
+                    max_age=max_age,
+                    **extra_kwargs
+                )
             # Allow shorthand like {pii: "email"}
             if "pii" in cfg:
                 return ProviderRegistry.from_config(PII_CATALOG[cfg["pii"]])  # type: ignore

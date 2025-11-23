@@ -58,11 +58,8 @@ class Settings(BaseSettings):
             path=self.POSTGRES_DB,
         ))
 
-    # MinIO settings
-    MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_BUCKET: str = "synthetic-data"
+    # Storage settings (local directory-based)
+    STORAGE_BASE_PATH: str = "storage/requests"
 
     # JWT settings
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
@@ -124,10 +121,6 @@ class Settings(BaseSettings):
     # Security toggles
     AUTH_DISABLED: bool = False
     API_KEY_HASH_ALGO: str = "sha256"
-
-    # MinIO extras
-    MINIO_SECURE: bool = False
-    MINIO_REGION: Optional[str] = None
 
     # DB pool tuning
     DB_POOL_SIZE: int = 5

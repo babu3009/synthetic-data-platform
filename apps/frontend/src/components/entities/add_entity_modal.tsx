@@ -15,6 +15,7 @@ type Props = {
 export default function AddEntityModal({ show, onHide, projectId, existingNames, onCreated }: Props) {
   const [tab, setTab] = useState<'ddl' | 'json' | 'fields'>('ddl')
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   // DDL state
@@ -154,6 +155,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     onHide()
     setTimeout(() => {
       setName('')
+      setDescription('')
       resetState()
       setTab('ddl')
     }, 200)
@@ -321,6 +323,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
     const entity: EntitySchema = {
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
       name: name.trim(),
+      description: description.trim() || undefined,
       tables: t,
       updatedAt: new Date().toISOString(),
     }
@@ -356,6 +359,17 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
             isInvalid={!!name && !nameUnique}
           />
           <Form.Control.Feedback type="invalid">Name must be unique in this project.</Form.Control.Feedback>
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="entityDescription">
+          <Form.Label>Description (optional)</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={2}
+            placeholder="Brief description of this entity's purpose..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </Form.Group>
 
   <Tabs activeKey={tab} onSelect={(k) => setTab((k as 'ddl' | 'json' | 'fields') ?? 'ddl')}>

@@ -39,7 +39,12 @@ export async function createRequest(projectId: string, payload: Partial<Request>
 }
 
 export async function startRequest(projectId: string, requestId: string) {
-  const res = await api.post(`/api/v1/projects/${projectId}/requests/${requestId}:start`)
+  // Use longer timeout since the job runs synchronously and can take time
+  const res = await api.post(
+    `/api/v1/projects/${projectId}/requests/${requestId}:start`,
+    {},
+    { timeout: 60000 } // 60 second timeout for job execution
+  )
   return res.data as Request
 }
 

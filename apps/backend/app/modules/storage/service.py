@@ -36,6 +36,10 @@ async def get_artifact(db: AsyncSession, *, request_id: UUID, artifact_id: UUID)
 
 async def sign_artifact(db: AsyncSession, *, request_id: UUID, artifact_id: UUID, expires: int = 3600) -> Dict[str, Any]:
     art = await get_artifact(db, request_id=request_id, artifact_id=artifact_id)
+    
+    # Get request to fetch alias for filename prefix
+    req = await crud.request.get(db=db, id=request_id)
+    
     storage = get_storage()
     uri = str(getattr(art, "storage_uri", ""))
     object_name = uri
@@ -46,7 +50,16 @@ async def sign_artifact(db: AsyncSession, *, request_id: UUID, artifact_id: UUID
             object_name = uri
     elif uri.startswith("file:") and "/requests/" in uri:
         object_name = uri.split("/requests/")[-1]
-    url = storage.get_signed_url(str(object_name), expires_seconds=int(expires))
+    
+    # Build custom download filename with request alias prefix
+    download_filename = None
+    if req and req.alias:
+        # Extract original filename from object_name
+        original_filename = object_name.split("/")[-1]
+        # Create prefixed filename: {alias}_{original_filename}
+        download_filename = f"{req.alias}_{original_filename}"
+    
+    url = storage.get_signed_url(str(object_name), expires_seconds=int(expires), download_filename=download_filename)
     return {"url": url, "expires": int(expires)}
 
 
