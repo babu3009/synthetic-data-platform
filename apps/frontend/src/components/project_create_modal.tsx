@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Modal, Button, Form, Alert } from 'react-bootstrap'
+import { Modal, Button, Form } from 'react-bootstrap'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createProject, checkProjectNameExists } from '../services/projects'
 import { useToasts } from '../hooks/use_toasts'

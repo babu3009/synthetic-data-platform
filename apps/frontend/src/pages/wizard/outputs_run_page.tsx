@@ -3,7 +3,7 @@ import { Alert, Button, Col, Form, Row, Table } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../../state/wizard'
 import type { EntitySchema } from '../../state/wizard'
-import { createRequest, estimateRequest, startRequest } from '../../services/requests'
+import { createRequest, estimateRequest } from '../../services/requests'
 
 type Format = 'csv' | 'xlsx' | 'parquet' | 'jsonl'
 type Destination = 'download' | 'object-store' | 'db-writeback' | 'kafka'

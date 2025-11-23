@@ -186,7 +186,7 @@ export default function AddEntityModal({ show, onHide, projectId, existingNames,
         return
       }
       const created = await uploadDDLSource(projectId, file, dialect)
-      const canonical = await getSourceSchema(projectId, source.id, 'canonical')
+      const canonical = await getSourceSchema(projectId, created.id)
       const parsed = tablesFromCanonicalSchema(canonical)
       setDdlTables(parsed)
       // Auto-infer providers for the parsed tables

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, useEffect, type ChangeEvent, lazy, Suspense } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect, lazy, Suspense } from 'react'
 import ReactFlow, {
   addEdge,
   Background,
@@ -13,7 +13,7 @@ import ReactFlow, {
   useNodesState,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { Button, Col, Form, Row } from 'react-bootstrap'
+import { Button, Col, Row } from 'react-bootstrap'
 import TableNode from './table_node'
 import { Relationship, useWizard, Column, Table, EntitySchema } from '../../state/wizard'
 import EdgePanel from './edge_panel'
@@ -46,7 +46,6 @@ function compatible(a: string, b: string) {
 export default function DiagramCanvas(_: DiagramProps) {
   const { state, dispatch } = useWizard()
   const entity = useMemo(() => state.entities.find((e: EntitySchema) => e.id === state.selectedEntityId) || state.entities[0], [state.entities, state.selectedEntityId])
-  const entityId = entity?.id
 
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null)
   const [editingColumn, setEditingColumn] = useState<{ table: string; column: Column } | null>(null)

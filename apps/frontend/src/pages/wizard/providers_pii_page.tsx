@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Alert, Button, Col, Form, Modal, Row, Table, OverlayTrigger, Tooltip, Popover } from 'react-bootstrap'
 import { useWizard, type Column } from '../../state/wizard'
-import { inferProviders, saveProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
+import { inferProviders, autosaveProviders, type ProviderSuggestion } from '../../services/providers'
 import { autosaveEntity, updateEntity } from '../../services/entities'
 import { useAutosave } from '../../hooks/use_autosave'
 import ProviderConfigBuilder from '../../components/provider_config_builder'
@@ -447,13 +447,13 @@ export default function ProvidersPiiPage() {
     setError(null)
     try {
       // Save entity schema to database (includes all provider configurations)
-      const schema = {
-        tables: entity.tables || [],
+      const updatedTables = entity.tables || []
+      
+      await updateEntity(projectId, entity.id, { 
+        tables: updatedTables,
         relationships: entity.relationships,
         layout: entity.layout
-      }
-      
-      await updateEntity(projectId, entity.id, { schema })
+      })
       
       // Update local state to mark as saved
       dispatch({ 

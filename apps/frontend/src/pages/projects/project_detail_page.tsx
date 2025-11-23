@@ -22,13 +22,13 @@ const ProjectDetailPage: React.FC = () => {
   React.useEffect(() => {
     if (data) {
       setName(data.name)
-      setOwner(data.owner)
+      setOwner(data.owner || '')
   setWebhookUrl(data.webhook_run_status_url || '')
     }
   }, [data])
 
   const saveMut = useMutation({
-    mutationFn: () => updateProject(id!, { name, owner, webhook_run_status_url: webhookUrl || null }),
+    mutationFn: () => updateProject(id!, { name, webhook_run_status_url: webhookUrl || null }),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['project.byId', id] })
   const prevById = qc.getQueryData(['project.byId', id]) as Project | undefined

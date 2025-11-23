@@ -110,12 +110,16 @@ export type Relationship = z.infer<typeof RelationshipSchema>
 export const EntitySchemaSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  description: z.string().optional(),
+  version: z.number().optional(),
   tables: z.array(TableDefSchema).min(1),
   updatedAt: z.string().optional(),
   relationships: z.array(RelationshipSchema).optional(),
   layout: z
     .record(z.string(), z.object({ x: z.number(), y: z.number() }))
     .optional(),
+  rulesConfig: z.string().optional(),
+  rulesFormat: z.enum(['yaml', 'json']).optional(),
 })
 export type EntitySchema = z.infer<typeof EntitySchemaSchema>
 export type EntitySchemaCreate = Omit<EntitySchema, 'id' | 'updatedAt'>

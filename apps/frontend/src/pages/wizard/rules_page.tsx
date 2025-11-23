@@ -77,7 +77,6 @@ export default function RulesPage() {
   const [report, setReport] = useState<ValidationReport | null>(null)
   const [sending, setSending] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   // Sync selectedEntityId with wizard state
   useEffect(() => {
@@ -230,7 +229,7 @@ export default function RulesPage() {
       // Shallow error surface
       const msg = e instanceof Error ? e.message : 'Validation failed'
       setReport({ sample: [], final: [] })
-      setError(msg)
+      console.error('Validation error:', msg)
     } finally {
       setSending(false)
     }
@@ -245,8 +244,8 @@ export default function RulesPage() {
     try {
       // Save to backend via API
       await updateEntity(state.projectId, entity.id, {
-        rules_config: rulesConfig,
-        rules_format: rulesFormat
+        rulesConfig,
+        rulesFormat,
       })
       
       // Update local state
@@ -259,7 +258,6 @@ export default function RulesPage() {
         }
       })
       
-      setError(null)
       // Show success feedback
       const successMsg = document.createElement('div')
       successMsg.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3'
@@ -269,7 +267,7 @@ export default function RulesPage() {
       setTimeout(() => successMsg.remove(), 2000)
     } catch (err: any) {
       console.error('Failed to save rules:', err)
-      setError(`Failed to save rules: ${err.message || 'Unknown error'}`)
+      alert(`Failed to save rules: ${err.message || 'Unknown error'}`)
     }
   }
 
